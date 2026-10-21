@@ -8,7 +8,7 @@ React · Vite · TypeScript · Tailwind CSS v4 · React Router
 **pré-requisito:** Node.js e npm instalados.
 
 ```bash
-git clone <URL_DO_REPOSITORIO>
+git clone https://github.com/nanda-pereira/equilibra-front.git
 cd equilibra-front
 npm install
 npm run dev
