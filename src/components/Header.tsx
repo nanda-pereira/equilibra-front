@@ -1,5 +1,5 @@
-
 import logo from "../assets/pedras-logo.svg";
+import Button from "./ui/Button";
 
 const navigationItems = [
   { label: "Início", href: "#inicio" },
@@ -12,39 +12,36 @@ const navigationItems = [
 export default function Header() {
   return (
     <header className="absolute inset-x-0 top-0 z-50">
-      <div className="mx-auto flex min-h-16 max-w-[1440px] items-center justify-between gap-6 px-6 py-4 lg:px-14">
+      <div className="mx-auto flex w-full max-w-[1481px] items-center justify-between gap-6 px-6 pt-6 md:px-10 xl:px-[6.4vw] xl:pt-[43px]">
         <a
           href="#inicio"
           aria-label="Equilibra — página inicial"
-          className="flex shrink-0 items-center gap-2"
+          className="flex shrink-0 items-center gap-1.5"
         >
-          <img src={logo} alt="" className="h-9 w-auto" />
-          <span className="text-xs font-semibold tracking-[0.3em] text-[#123F42]">
+          <img src={logo} alt="" className="h-10 w-auto md:h-[53px]" />
+          <span className="text-base font-semibold tracking-[0.32em] text-deep xl:text-[22px]">
             EQUILIBRA
           </span>
         </a>
 
         <nav
           aria-label="Navegação principal"
-          className="hidden items-center gap-6 md:flex lg:gap-8"
+          className="hidden items-center gap-5 lg:flex xl:gap-11"
         >
           {navigationItems.map((item) => (
             <a
               key={item.href}
               href={item.href}
-              className="text-[11px] text-[#282B2D] transition-colors hover:text-[#247477]"
+              className="text-[15px] text-ink transition-colors hover:text-action xl:text-base"
             >
               {item.label}
             </a>
           ))}
         </nav>
 
-        <a
-          href="#acesso"
-          className="shrink-0 rounded-full bg-[#247477] px-4 py-2 text-[10px] font-medium text-white transition-colors hover:bg-[#123F42]"
-        >
+        <Button size="sm" href="#">
           Acesso à plataforma
-        </a>
+        </Button>
       </div>
     </header>
   );
