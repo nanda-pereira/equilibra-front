@@ -4,8 +4,7 @@ export default function Hero() {
   return (
     <section
       id="inicio"
-      className="hero-screen relative flex items-center justify-center overflow-hidden bg-page px-6 pb-14 pt-32 text-center xl:pb-[60px] xl:pt-[110px]"
-    >
+      className="hero-screen relative flex items-start justify-center overflow-hidden bg-page px-6 pb-14 pt-36 text-center xl:pb-[60px] xl:pt-[clamp(160px,14.5vw,220px)]"    >
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_8%_100%,rgba(78,164,160,0.20),transparent_35%),radial-gradient(ellipse_at_90%_5%,rgba(78,164,160,0.10),transparent_38%)]"
