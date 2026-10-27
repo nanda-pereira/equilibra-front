@@ -1,16 +1,34 @@
 type SectionEyebrowProps = {
   children: string;
-  lineWidth: number; // Figma: 140 (O problema), 124 (A solução), 200 (Como funciona)
+  lineWidth: number;
+  large?: boolean;
+  center?: boolean;
+  headingId?: string; 
+  className?: string;
 };
 
-export default function SectionEyebrow({ children, lineWidth }: SectionEyebrowProps) {
+export default function SectionEyebrow({
+  children,
+  lineWidth,
+  large = false,
+  center = false,
+  headingId,
+  className = "",
+}: SectionEyebrowProps) {
+  const Tag = headingId ? "h2" : "p";
+
+  const text = large
+    ? "h-[30px] text-[18px] tracking-[0.18em] text-black"
+    : "h-[43px] text-base tracking-[0.14em] text-ink";
+  const line = large ? "h-[3px]" : "mt-1 h-0.5";
+
   return (
-    <div>
-      <p className="flex h-[43px] items-center text-base font-medium uppercase tracking-[0.14em] text-ink">
+    <div className={`${center ? "flex flex-col items-center" : ""} ${className}`}>
+      <Tag id={headingId} className={`flex items-center font-medium uppercase ${text}`}>
         {children}
-      </p>
+      </Tag>
       <span
-        className="mt-1 block h-0.5 bg-brand"
+        className={`block bg-linear-to-r from-[#62B2AD] to-[#C0D9D3] ${line}`}
         style={{ width: lineWidth }}
         aria-hidden="true"
       />
