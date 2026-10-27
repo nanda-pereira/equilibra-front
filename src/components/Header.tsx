@@ -38,8 +38,8 @@ export default function Header() {
             </a>
           ))}
         </nav>
-
-        <Button size="sm" href="#">
+      {/* referenciado a pagina de cadastro apenas para teste */}
+        <Button size="sm" href="/cadastro">
           Acesso à plataforma
         </Button>
       </div>

@@ -14,6 +14,26 @@
   --color-ink-soft: #586463;
   --color-mint-100: #e8f5f3;
   --color-mint-200: #c5e3e0;
+  
+  --color-surface: #ffffff;
+  --color-disabled: #eef2f1;
+  --color-placeholder: #6b7776;
+  --color-line: #cbd5d3;
+  --color-field-border: #788685;
+
+  --color-success-bg: #e3f4ea;
+  --color-success-text: #1f6b42;
+  --color-attention-bg: #fff4d6;
+  --color-attention-text: #7a5600;
+  --color-alert-bg: #fde8e7;
+  --color-alert-text: #b3261e;
+  --color-info-bg: #e3f1fb;
+  --color-info-text: #1b5e8c;
+
+  --radius-pill: 999px;
+  --radius-panel: 32px;
+  --radius-card: 24px;
+  --radius-block: 20px;
 }
 
 @utility section-screen {
