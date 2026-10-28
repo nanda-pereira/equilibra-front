@@ -8,6 +8,8 @@ import {
 } from "../../modules/auth/types";
 import ProfileStep from "./register/ProfileStep";
 import DataStep from "./register/DataStep";
+import ReviewStep from "./register/ReviewStep";
+import WelcomeStep from "./register/WelcomeStep";
 
 const REGISTER_STEPS = ["Perfil", "Seus dados", "Conferir", "Boas-vindas"];
 
@@ -23,20 +25,19 @@ export default function RegisterPage() {
     setData((prev) => ({ ...prev, [field]: value }));
   }
 
+  const firstName = data.fullName.trim().split(/\s+/)[0] ?? "";
+
   return (
-    //ver qual das duas versoes de fundo fica melhor, para ver trocar de background="design-system" ou "figma"
+    // background: "figma" (reprodução do figma) ou "design-system" (o meu)
     <AuthLayout background="figma">
       <div className="flex flex-col items-center">
         <Stepper steps={REGISTER_STEPS} current={step} />
-        <p className="mt-6 text-sm font-medium uppercase tracking-[0.14em] text-action-hover">
+        <p className="mt-5 text-base uppercase leading-7 tracking-[0.14em] text-deep">
           Etapa {step + 1} de {REGISTER_STEPS.length}
         </p>
-        <h1 className="mt-2 text-center text-3xl font-medium text-deep md:text-4xl">
-          Criar conta
-        </h1>
       </div>
-
-      {step === 0 && (
+    <div className="flex flex-col lg:min-h-[600px]">
+            {step === 0 && (
         <ProfileStep
           value={profile}
           onChange={setProfile}
@@ -55,10 +56,19 @@ export default function RegisterPage() {
         />
       )}
 
-      {/*temporário, apagar quando a etapa 3 existir */}
-      {step === 2 && (
-        <p className="mt-10 text-center text-ink">Etapa 3 em construção.</p>
+      {step === 2 && profile && (
+        <ReviewStep
+          profile={profile}
+          data={data}
+          onEditProfile={() => setStep(0)}
+          onEditData={() => setStep(1)}
+          onBack={() => setStep(1)}
+          onNext={() => setStep(3)} // TODO: aqui entra a criação da conta quando houver backend
+        />
       )}
+
+      {step === 3 && <WelcomeStep firstName={firstName} />}
+    </div>
     </AuthLayout>
   );
 }

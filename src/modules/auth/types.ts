@@ -1,3 +1,16 @@
+export type ProfileType =
+  | "paciente"
+  | "medico"
+  | "cuidador-clinico"
+  | "cuidador-domiciliar";
+
+export const PROFILE_LABELS: Record<ProfileType, string> = {
+  paciente: "Paciente",
+  medico: "Médico",
+  "cuidador-clinico": "Cuidador clínico",
+  "cuidador-domiciliar": "Cuidador domiciliar",
+};
+
 export type RegisterData = {
   fullName: string;
   birthDate: string;

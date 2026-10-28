@@ -1,30 +1,46 @@
 import { useState } from "react";
-import Button from "../../../components/ui/Button";
-import ArrowRightIcon from "../../../components/ui/ArrowRightIcon";
+import Icon from "../../../components/ui/Icon";
+import StepHeading from "../../../components/ui/StepHeading";
+import StepNav from "../../../components/ui/StepNav";
+import {
+  ClinicalCaregiverIcon,
+  DoctorIcon,
+  HomeCaregiverIcon,
+  PatientIcon,
+} from "../../../components/ui/icons";
 import type { ProfileType } from "../../../modules/auth/types";
 
-const PROFILES: { value: ProfileType; title: string; description: string }[] = [
+const PROFILES = [
   {
     value: "paciente",
     title: "Paciente",
     description: "Quero acompanhar minha saúde com segurança e autonomia.",
+    icon: PatientIcon,
   },
   {
     value: "medico",
     title: "Médico",
     description: "Acompanho pacientes clinicamente e quero gerenciá-los.",
+    icon: DoctorIcon,
   },
   {
     value: "cuidador-clinico",
     title: "Cuidador clínico",
     description: "Sou cuidador e monitoro pacientes clinicamente.",
+    icon: ClinicalCaregiverIcon,
   },
   {
     value: "cuidador-domiciliar",
     title: "Cuidador domiciliar",
     description: "Sou um cuidador familiar, responsável domesticamente.",
+    icon: HomeCaregiverIcon,
   },
-];
+] satisfies {
+  value: ProfileType;
+  title: string;
+  description: string;
+  icon: typeof PatientIcon;
+}[];
 
 type ProfileStepProps = {
   value: ProfileType | null;
@@ -51,13 +67,12 @@ export default function ProfileStep({
 
   return (
     <div>
-      <p
-        id="profile-question"
-        className="mx-auto mt-4 max-w-[640px] text-center text-base text-ink md:text-lg"
-      >
-        Para começarmos, primeiro, nos conte: em qual desses perfis você se
-        encaixa mais?
-      </p>
+      <StepHeading
+        className="mt-3"
+        title="Criar conta"
+        descriptionId="profile-question"
+        description="Para começarmos, primeiro, nos conte: em qual desses perfis você se encaixa mais?"
+      />
 
       <fieldset
         aria-describedby="profile-question"
@@ -69,8 +84,7 @@ export default function ProfileStep({
           {PROFILES.map((profile) => (
             <label
               key={profile.value}
-              className="relative flex cursor-pointer flex-col items-center gap-4 rounded-card border border-mint-200 bg-white/60 px-5 py-8 text-center backdrop-blur-sm transition-shadow hover:shadow-[0_8px_32px_rgba(36,116,119,0.12)] has-[:checked]:shadow-[0_8px_32px_rgba(36,116,119,0.12)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-4 has-[:focus-visible]:outline-action lg:min-h-[280px]"
-            >
+              className="relative flex cursor-pointer flex-col items-center gap-4 rounded-card border border-mint-200 bg-white/60 px-5 py-8 text-center backdrop-blur-sm transition-shadow hover:shadow-[0_8px_32px_rgba(36,116,119,0.12)] has-[:checked]:shadow-[0_12px_40px_rgba(36,116,119,0.32)] has-[:checked]:hover:shadow-[0_12px_40px_rgba(36,116,119,0.32)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-4 has-[:focus-visible]:outline-action lg:min-h-[280px]"            >
               <input
                 type="radio"
                 name="profile"
@@ -82,10 +96,9 @@ export default function ProfileStep({
                 }}
                 className="sr-only"
               />
-              <span
-                aria-hidden="true"
-                className="size-[60px] rounded-full bg-[#ebebeb]"
-              />
+              <span className="flex size-[60px] items-center justify-center rounded-full bg-mint-100 text-action">
+                <Icon icon={profile.icon} size={28} />
+              </span>
               <span className="text-base font-medium text-ink md:text-lg">
                 {profile.title}
               </span>
@@ -97,32 +110,13 @@ export default function ProfileStep({
         </div>
 
         {showError && (
-          <p role="alert" className="mt-4 text-center text-sm text-alert-text">
-            Escolha um perfil para continuar.
+          <p role="alert" className="mt-4 min-h-5 text-center text-sm text-alert-text">
+            {showError ? "Escolha um perfil para continuar." : ""}
           </p>
         )}
       </fieldset>
 
-      <div className="mx-auto mt-10 flex max-w-[880px] flex-col-reverse gap-4 sm:grid sm:grid-cols-2 sm:justify-items-center">
-        <Button
-          variant="outline"
-          href={backHref}
-          className="w-full px-6! sm:w-auto"
-        >
-          <span aria-hidden="true" className="inline-flex rotate-180">
-            <ArrowRightIcon />
-          </span>
-          Voltar
-        </Button>
-        <Button
-          variant="outline"
-          withArrow
-          onClick={handleNext}
-          className="w-full px-6! sm:w-auto"
-        >
-          Próximo
-        </Button>
-      </div>
+      <StepNav backHref={backHref} onNext={handleNext} />
     </div>
   );
 }

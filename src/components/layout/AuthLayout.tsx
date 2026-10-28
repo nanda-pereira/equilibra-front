@@ -34,14 +34,14 @@ export default function AuthLayout({
         )}
       </div>
 
-      <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8 px-5 py-8 md:px-10 md:py-12">
+      <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-5 px-5 py-8 md:px-10 md:pb-12 md:pt-14">
         <Link
           to="/"
           aria-label="Equilibra — página inicial"
-          className="mx-auto flex w-fit items-center gap-4"
+          className="mx-auto flex w-fit items-center gap-1.5"
         >
-          <img src={logo} alt="" className="h-12 w-auto md:h-14" />
-          <span className="text-xl font-semibold tracking-[0.32em] text-deep md:text-2xl">
+          <img src={logo} alt="" className="h-12 w-auto md:h-[60px]" />
+          <span className="text-lg font-semibold tracking-[0.32em] text-deep md:text-[22px]">
             EQUILIBRA
           </span>
         </Link>

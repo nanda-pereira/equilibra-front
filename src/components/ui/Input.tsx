@@ -17,8 +17,8 @@ export default function Input({
   const errorId = `${id}-error`;
 
   return (
-    <div className={`flex flex-col gap-[10px] ${className}`}>
-      <label htmlFor={id} className="text-base font-medium text-ink">
+    <div className={`flex flex-col ${className}`}>
+      <label htmlFor={id} className="mb-2.5 text-base text-ink">
         {label}
       </label>
 
@@ -28,24 +28,26 @@ export default function Input({
           id={id}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
-          className={`h-14 w-full rounded-full bg-white px-6 text-base text-ink placeholder:text-placeholder focus:border-action focus:outline-none focus:ring-4 focus:ring-action/18 ${
-            error
-              ? "border-2 border-alert-text"
-              : "border-[1.5px] border-field-border"
-          } ${trailing ? "pr-24" : ""}`}
+          className={`h-11 w-full rounded-full bg-transparent text-sm text-ink transition-colors placeholder:text-placeholder hover:bg-mint-100/60 focus:border-action focus:bg-white/60 focus:outline-none focus:ring-4 focus:ring-action/15 ${
+            trailing ? "pl-6 pr-12" : "px-6"
+          } ${
+            error ? "border-[1.5px] border-alert-text" : "border border-brand"
+          }`}
         />
         {trailing && (
-          <div className="absolute inset-y-0 right-5 flex items-center">
+          <div className="absolute inset-y-0 right-2 flex items-center">
             {trailing}
           </div>
         )}
       </div>
 
-      {error && (
-        <p id={errorId} className="text-sm text-alert-text">
-          {error}
-        </p>
-      )}
+      <p
+        id={errorId}
+        aria-live="polite"
+        className="mt-1 min-h-5 text-sm text-alert-text"
+      >
+        {error}
+      </p>
     </div>
   );
 }

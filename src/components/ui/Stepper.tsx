@@ -1,9 +1,12 @@
 type StepperProps = {
   steps: string[];
-  /** índice da etapa atual, começa em 0 */
+  /** índice da etapa atual, começando em 0 */
   current: number;
   className?: string;
 };
+
+const DOT = 7;
+const GAP = 7;
 
 export default function Stepper({ steps, current, className = "" }: StepperProps) {
   const reached = current + 1;
@@ -19,13 +22,13 @@ export default function Stepper({ steps, current, className = "" }: StepperProps
         ))}
       </ol>
 
-      <div aria-hidden="true" className="flex items-center gap-2">
+      <div aria-hidden="true" className="flex items-center" style={{ gap: GAP }}>
         <span
-          className="h-2 rounded-full bg-action transition-all"
-          style={{ width: reached * 8 + (reached - 1) * 8 }}
+          className="h-[7px] rounded-full bg-brand transition-all"
+          style={{ width: reached * DOT + (reached - 1) * GAP }}
         />
         {Array.from({ length: remaining }, (_, i) => (
-          <span key={i} className="size-2 rounded-full bg-mint-200" />
+          <span key={i} className="size-[7px] rounded-full bg-mint-200" />
         ))}
       </div>
     </div>
