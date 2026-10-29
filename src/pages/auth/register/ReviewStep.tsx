@@ -3,6 +3,7 @@ import Icon from "../../../components/ui/Icon";
 import StepHeading from "../../../components/ui/StepHeading";
 import StepNav from "../../../components/ui/StepNav";
 import { EyeIcon, EyeOffIcon } from "../../../components/ui/icons";
+import { PROFILE_FORM } from "../../../modules/auth/registerFields";
 import {
   PROFILE_LABELS,
   type ProfileType,
@@ -12,6 +13,8 @@ import {
 type ReviewStepProps = {
   profile: ProfileType;
   data: RegisterData;
+  submitting: boolean;
+  error: string;
   onEditProfile: () => void;
   onEditData: () => void;
   onBack: () => void;
@@ -58,22 +61,26 @@ function Info({ label, children }: { label: string; children: ReactNode }) {
 export default function ReviewStep({
   profile,
   data,
+  submitting,
+  error,
   onEditProfile,
   onEditData,
   onBack,
   onNext,
 }: ReviewStepProps) {
   const [showPassword, setShowPassword] = useState(false);
+  const form = PROFILE_FORM[profile];
+  const fields = form.fields.filter((field) => field.key !== "confirmPassword");
 
   return (
-    <div>
+    <div className="flex flex-1 flex-col">
       <StepHeading
         className="mt-3"
         title="Verifique seus dados"
         description="Confira as informações antes de criar sua conta. Você pode editar qualquer campo."
       />
 
-      <div className="mx-auto mt-12 max-w-[800px]">
+      <div className="mx-auto mt-12 w-full max-w-[800px]">
         <section aria-labelledby="review-profile">
           <SectionHeader
             id="review-profile"
@@ -93,31 +100,61 @@ export default function ReviewStep({
             editLabel="Editar dados pessoais"
             onEdit={onEditData}
           />
-          <dl className="mt-4 grid grid-cols-1 gap-x-10 gap-y-6 min-[900px]:grid-cols-3">
-            <Info label="Nome completo">{data.fullName}</Info>
-            <Info label="Data de nascimento">{data.birthDate}</Info>
-            <Info label="CPF">{data.cpf}</Info>
-            <Info label="E-mail">{data.email}</Info>
-            <Info label="Senha">
-              <span className="inline-flex items-center gap-1">
-                <span className={showPassword ? "break-all" : "tracking-wider"}>
-                  {showPassword ? data.password : "•".repeat(data.password.length)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                  className="flex size-9 shrink-0 items-center justify-center rounded-full text-ink-soft hover:text-action focus-visible:outline-2 focus-visible:outline-action"
-                >
-                  <Icon icon={showPassword ? EyeOffIcon : EyeIcon} size={20} />
-                </button>
-              </span>
-            </Info>
+          <dl
+            className={`mt-4 grid grid-cols-1 gap-x-10 gap-y-6 ${
+              form.columns === 3
+                ? "min-[900px]:grid-cols-3"
+                : "min-[900px]:grid-cols-2"
+            }`}
+          >
+            {fields.map((field) =>
+              field.kind === "password" ? (
+                <Info key={field.key} label={field.label}>
+                  <span className="inline-flex items-center gap-1">
+                    <span
+                      className={showPassword ? "break-all" : "tracking-wider"}
+                    >
+                      {showPassword
+                        ? data.password
+                        : "•".repeat(data.password.length)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={
+                        showPassword ? "Ocultar senha" : "Mostrar senha"
+                      }
+                      className="flex size-9 shrink-0 items-center justify-center rounded-full text-ink-soft hover:text-action focus-visible:outline-2 focus-visible:outline-action"
+                    >
+                      <Icon
+                        icon={showPassword ? EyeOffIcon : EyeIcon}
+                        size={20}
+                      />
+                    </button>
+                  </span>
+                </Info>
+              ) : (
+                <Info key={field.key} label={field.label}>
+                  {data[field.key]}
+                </Info>
+              ),
+            )}
           </dl>
         </section>
       </div>
 
-      <StepNav onBack={onBack} onNext={onNext} />
+      <p
+        role="alert"
+        className="mx-auto mt-4 min-h-5 w-full max-w-[800px] text-center text-sm text-alert-text"
+      >
+        {error}
+      </p>
+
+      <StepNav
+        onBack={onBack}
+        onNext={onNext}
+        nextLabel={submitting ? "Criando conta…" : "Próximo"}
+      />
     </div>
   );
 }

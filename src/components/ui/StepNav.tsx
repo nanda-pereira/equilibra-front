@@ -6,6 +6,7 @@ type StepNavProps = {
   onBack?: () => void;
   onNext?: () => void;
   nextType?: "button" | "submit";
+  nextLabel?: string;
 };
 
 export default function StepNav({
@@ -13,6 +14,7 @@ export default function StepNav({
   onBack,
   onNext,
   nextType = "button",
+  nextLabel = "Próximo",
 }: StepNavProps) {
   const sizing = "w-full px-6! sm:w-auto";
 
@@ -32,7 +34,7 @@ export default function StepNav({
         onClick={onNext}
         className={sizing}
       >
-        Próximo
+        {nextLabel}
       </Button>
     </div>
   );

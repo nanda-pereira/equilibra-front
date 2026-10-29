@@ -18,6 +18,8 @@ export type RegisterData = {
   email: string;
   password: string;
   confirmPassword: string;
+  crm: string;
+  specialty: string;
   consent: boolean;
 };
 
@@ -28,5 +30,7 @@ export const EMPTY_REGISTER_DATA: RegisterData = {
   email: "",
   password: "",
   confirmPassword: "",
+  crm: "",
+  specialty: "",
   consent: false,
 };

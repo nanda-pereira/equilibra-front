@@ -68,3 +68,9 @@ export function isValidBirthDate(value: string) {
 
 export const isValidEmail = (value: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
+// converte a data de nascimento do formato brasileiro (dd/mm/yyyy) para o formato ISO (yyyy-mm-dd)
+export function brDateToIso(value: string) {
+  const [day, month, year] = value.split("/");
+  return `${year}-${month}-${day}`;
+}
