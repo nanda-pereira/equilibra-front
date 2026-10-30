@@ -1,40 +1,34 @@
 import { useState } from "react";
-import EmptyState from "../../../components/app/EmptyState";
+import Avatar from "../../../components/app/Avatar";
 import GlassCard from "../../../components/app/GlassCard";
 import ListRow from "../../../components/app/ListRow";
 import MetricCard from "../../../components/app/MetricCard";
 import PageHeader from "../../../components/app/PageHeader";
 import ProgressRing from "../../../components/app/ProgressRing";
 import SmallButton from "../../../components/app/SmallButton";
-import StatusBadge from "../../../components/app/StatusBadge";
-import { BarTrendChart, LineTrendChart } from "../../../components/app/charts";
+import { BarTrendChart } from "../../../components/app/charts";
 import {
-  ActivityIcon,
-  AlertIcon,
   CalendarIcon,
+  CheckCircleIcon,
   ExerciseIcon,
-  HeartIcon,
-  InfoIcon,
   MedicineIcon,
-  MoonIcon,
-  StepsIcon,
+  MessageIcon,
 } from "../../../components/ui/icons";
 import {
   appointment,
-  device,
+  careNetwork,
   exerciseToday,
-  heartRateToday,
+  exerciseWeek,
   medicationsToday,
-  metricsToday,
-  recentEvents,
-  stepsWeek,
+  medicationsWeek,
+  patientNotes,
 } from "../../../modules/demo/demoData";
 
 export default function PatientDashboard() {
   const [meds, setMeds] = useState(medicationsToday);
   const taken = meds.filter((med) => med.taken).length;
   const nextMed = meds.find((med) => !med.taken);
-  const hasReadings = device.connected && heartRateToday.length > 0;
+  const week = exerciseWeek();
 
   function confirmMed(id: string) {
     // simulado: só atualiza a tela; nada é gravado
@@ -43,14 +37,7 @@ export default function PatientDashboard() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader demo>
-        <span className="inline-flex h-8 items-center gap-2 rounded-full bg-mint-100 px-3 text-sm font-medium text-action-hover">
-          <span aria-hidden="true" className="size-2 rounded-full bg-action" />
-          {device.connected
-            ? `Smartwatch conectado · sincronizado ${device.lastSyncLabel}`
-            : "Smartwatch sem conexão"}
-        </span>
-      </PageHeader>
+      <PageHeader demo />
 
       <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
         <GlassCard title="Medicamentos de hoje">
@@ -66,20 +53,29 @@ export default function PatientDashboard() {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
           <MetricCard
-            icon={HeartIcon}
-            label="Frequência cardíaca"
-            value={String(metricsToday.heartRate)}
-            unit="bpm"
-            note={`Última leitura ${device.lastSyncLabel}`}
+            icon={CalendarIcon}
+            label="Próxima consulta"
+            value={appointment.dayLabel}
+            note={`às ${appointment.time} · Dra. Marina`}
           />
-          <MetricCard icon={ActivityIcon} label="Tremores" value={metricsToday.tremor} note="Menor que ontem" />
           <MetricCard
-            icon={StepsIcon}
-            label="Passos hoje"
-            value={metricsToday.steps.toLocaleString("pt-BR")}
-            note={`Meta: ${metricsToday.stepsGoal.toLocaleString("pt-BR")}`}
+            icon={ExerciseIcon}
+            label="Exercício de hoje"
+            value={exerciseToday.duration}
+            note={exerciseToday.title}
           />
-          <MetricCard icon={MoonIcon} label="Sono" value={metricsToday.sleep} note="Última noite" />
+          <MetricCard
+            icon={CheckCircleIcon}
+            label="Exercícios da semana"
+            value={`${week.doneBase} de ${week.total}`}
+            note="concluídos"
+          />
+          <MetricCard
+            icon={MessageIcon}
+            label="Registros recentes"
+            value={String(patientNotes.length)}
+            note="da sua equipe"
+          />
         </div>
       </div>
 
@@ -104,8 +100,8 @@ export default function PatientDashboard() {
           <ListRow
             icon={ExerciseIcon}
             title={exerciseToday.title}
-            subtitle={exerciseToday.detail}
-            trailing={<StatusBadge status="stable" label="Feito" />}
+            subtitle={`${exerciseToday.duration} · recomendado pela Dra. Marina`}
+            trailing={<SmallButton to="/app/exercicios">Ver exercícios</SmallButton>}
           />
           <ListRow
             icon={CalendarIcon}
@@ -117,52 +113,45 @@ export default function PatientDashboard() {
       </GlassCard>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <GlassCard title="Frequência cardíaca hoje" description="Leituras do smartwatch">
-          {hasReadings ? (
-            <LineTrendChart
-              data={heartRateToday}
-              xKey="time"
-              yKey="bpm"
-              seriesName="Frequência cardíaca (bpm)"
-              summary={`Frequência cardíaca de hoje: ${heartRateToday
-                .map((item) => `${item.time}, ${item.bpm} bpm`)
-                .join("; ")}.`}
-            />
-          ) : (
-            <EmptyState
-              title="Sem leituras do smartwatch neste período"
-              description="Isso não indica ausência de eventos, apenas que o dispositivo não enviou dados."
-            />
-          )}
+        <GlassCard title="Medicamentos na semana" description="Registrados por dia (3 por dia)">
+          <BarTrendChart
+            data={medicationsWeek}
+            xKey="day"
+            yKey="medications"
+            seriesName="Medicamentos registrados"
+            summary={`Medicamentos registrados nos últimos 7 dias: ${medicationsWeek
+              .map((item) => `${item.day}, ${item.medications} de 3`)
+              .join("; ")}.`}
+          />
         </GlassCard>
 
-        <GlassCard title="Passos na semana" description={`Meta diária: ${metricsToday.stepsGoal.toLocaleString("pt-BR")}`}>
-          {hasReadings ? (
-            <BarTrendChart
-              data={stepsWeek}
-              xKey="day"
-              yKey="steps"
-              seriesName="Passos"
-              summary={`Passos nos últimos 7 dias: ${stepsWeek
-                .map((item) => `${item.day}, ${item.steps}`)
-                .join("; ")}.`}
-            />
-          ) : (
-            <EmptyState title="Sem leituras do smartwatch neste período" />
-          )}
+        <GlassCard title="Sua rede de cuidado">
+          <ul className="flex flex-col gap-3">
+            {careNetwork.map((person) => (
+              <li
+                key={person.id}
+                className="flex items-center gap-4 rounded-[20px] bg-mint-100/70 px-4 py-3"
+              >
+                <Avatar name={person.name} tone="soft" className="bg-white!" />
+                <div>
+                  <p className="text-base font-medium text-ink">{person.name}</p>
+                  <p className="text-sm text-ink-soft">{person.role}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
         </GlassCard>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <GlassCard title="Últimos eventos">
+        <GlassCard title="Registros recentes">
           <ul className="flex flex-col gap-3">
-            {recentEvents.map((event) => (
+            {patientNotes.map((note) => (
               <ListRow
-                key={event.id}
-                icon={event.status === "info" ? InfoIcon : AlertIcon}
-                title={event.text}
-                subtitle={event.when}
-                trailing={<StatusBadge status={event.status} />}
+                key={note.id}
+                icon={MessageIcon}
+                title={note.text}
+                subtitle={`${note.author} · ${note.when}`}
               />
             ))}
           </ul>

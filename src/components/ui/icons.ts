@@ -25,4 +25,6 @@ export {
   InformationCircleIcon as InfoIcon,
   ArrowUpDownIcon as StepsIcon,
   Clock01Icon as ClockIcon,
+  ArrowLeft01Icon as ChevronLeftIcon,
+  ArrowRight01Icon as ChevronRightIcon,
 } from "@hugeicons/core-free-icons";

@@ -1,17 +1,21 @@
-import EmptyState from "../../../components/app/EmptyState";
 import Avatar from "../../../components/app/Avatar";
+import EmptyState from "../../../components/app/EmptyState";
 import GlassCard from "../../../components/app/GlassCard";
 import ListRow from "../../../components/app/ListRow";
 import MetricCard from "../../../components/app/MetricCard";
 import PageHeader from "../../../components/app/PageHeader";
 import SmallButton from "../../../components/app/SmallButton";
-import StatusBadge from "../../../components/app/StatusBadge";
-import { EventsChart } from "../../../components/app/charts";
-import { AlertIcon, CalendarIcon, ClockIcon, PatientsIcon } from "../../../components/ui/icons";
-import { doctorAgenda, eventsWeek, patients, recentRecords } from "../../../modules/demo/demoData";
+import { BarTrendChart } from "../../../components/app/charts";
+import { CalendarIcon, ClockIcon, MessageIcon, PatientsIcon } from "../../../components/ui/icons";
+import {
+  agendaToday,
+  appointmentsNextDays,
+  patients,
+  recentRecords,
+} from "../../../modules/demo/demoData";
 
 export default function DoctorDashboard() {
-  const highLevel = patients.filter((patient) => patient.event.status === "alert").length;
+  const today = agendaToday("medico");
 
   return (
     <div className="flex flex-col gap-6">
@@ -19,24 +23,19 @@ export default function DoctorDashboard() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
         <MetricCard icon={PatientsIcon} label="Pacientes sob responsabilidade" value={String(patients.length)} />
-        <MetricCard icon={CalendarIcon} label="Consultas hoje" value={String(doctorAgenda.length)} />
-        <MetricCard
-          icon={AlertIcon}
-          label="Pacientes com evento de nível alto"
-          value={String(highLevel)}
-          note="Pelo último evento registrado"
-        />
+        <MetricCard icon={CalendarIcon} label="Consultas hoje" value={String(today.length)} />
+        <MetricCard icon={MessageIcon} label="Registros recentes" value={String(recentRecords.length)} />
       </div>
 
       <GlassCard title="Pacientes" action={<SmallButton to="/app/pacientes">Ver todos</SmallButton>}>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left">
-            <caption className="sr-only">Pacientes sob responsabilidade e último evento de cada um</caption>
+            <caption className="sr-only">Pacientes sob responsabilidade</caption>
             <thead>
               <tr className="text-sm text-ink-soft">
                 <th scope="col" className="pb-3 font-medium">Paciente</th>
-                <th scope="col" className="pb-3 font-medium">Última sincronização</th>
-                <th scope="col" className="pb-3 font-medium">Último evento</th>
+                <th scope="col" className="pb-3 font-medium">Próxima consulta</th>
+                <th scope="col" className="pb-3 font-medium">Medicamentos na semana</th>
                 <th scope="col" className="pb-3"><span className="sr-only">Ações</span></th>
               </tr>
             </thead>
@@ -52,14 +51,9 @@ export default function DoctorDashboard() {
                       </div>
                     </div>
                   </td>
-                  <td className="py-3 pr-4 text-base text-ink">{patient.lastSync}</td>
-                  <td className="py-3 pr-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <StatusBadge status={patient.event.status} />
-                      <span className="text-sm text-ink-soft">
-                        {patient.event.text} · {patient.event.when}
-                      </span>
-                    </div>
+                  <td className="py-3 pr-4 text-base text-ink">{patient.nextAppointment}</td>
+                  <td className="py-3 pr-4 text-base text-ink">
+                    {patient.medsWeek.taken} de {patient.medsWeek.total}
                   </td>
                   <td className="py-3 text-right">
                     <SmallButton to="/app/pacientes" label={`Ver ${patient.name}`}>
@@ -74,22 +68,30 @@ export default function DoctorDashboard() {
       </GlassCard>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <GlassCard title="Eventos por nível na semana" description="Soma de todos os pacientes">
-          <EventsChart
-            data={eventsWeek}
-            summary={`Eventos por nível nos últimos 7 dias: ${eventsWeek
-              .map((d) => `${d.day}, ${d.stable} estáveis, ${d.attention} de atenção, ${d.alert} de alerta`)
+        <GlassCard title="Consultas nos próximos 7 dias">
+          <BarTrendChart
+            data={appointmentsNextDays}
+            xKey="day"
+            yKey="appointments"
+            seriesName="Consultas"
+            summary={`Consultas nos próximos 7 dias: ${appointmentsNextDays
+              .map((item) => `${item.day}, ${item.appointments}`)
               .join("; ")}.`}
           />
         </GlassCard>
 
-        <GlassCard title="Agenda de hoje">
-          {doctorAgenda.length === 0 ? (
+        <GlassCard title="Agenda de hoje" action={<SmallButton to="/app/agenda">Ver agenda</SmallButton>}>
+          {today.length === 0 ? (
             <EmptyState title="Nenhuma consulta cadastrada para hoje" />
           ) : (
             <ul className="flex flex-col gap-3">
-              {doctorAgenda.map((item) => (
-                <ListRow key={item.id} icon={ClockIcon} title={item.patient} subtitle={`Consulta às ${item.time}`} />
+              {today.map((item) => (
+                <ListRow
+                  key={item.id}
+                  icon={ClockIcon}
+                  title={item.title}
+                  subtitle={`${item.detail} · ${item.time}`}
+                />
               ))}
             </ul>
           )}
@@ -101,7 +103,7 @@ export default function DoctorDashboard() {
           {recentRecords.map((record) => (
             <ListRow
               key={record.id}
-              icon={CalendarIcon}
+              icon={MessageIcon}
               title={`${record.patient} · ${record.text}`}
               subtitle={`${record.author} · ${record.when}`}
             />
