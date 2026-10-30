@@ -72,3 +72,12 @@ textarea,
 select {
   font: inherit;
 }
+
+@utility glass-card {
+  background: rgb(255 255 255 / 0.7);
+  border: 1px solid #fff;
+  box-shadow:
+    0 0 0 1px rgb(36 116 119 / 0.08),
+    0 16px 40px rgb(36 116 119 / 0.1);
+  backdrop-filter: blur(20px);
+}

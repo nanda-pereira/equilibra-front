@@ -39,7 +39,7 @@ export default function Header() {
           ))}
         </nav>
       {/* referenciado a pagina de cadastro apenas para teste */}
-        <Button size="sm" href="/cadastro">
+        <Button size="sm" href="/login">
           Acesso à plataforma
         </Button>
       </div>

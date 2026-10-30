@@ -50,8 +50,6 @@ export default function RegisterPage() {
     }
   }
 
-  const firstName = data.fullName.trim().split(/\s+/)[0] ?? "";
-
   return (
     // background: "figma" (reprodução do print) ou "design-system" (o meu)
     <AuthLayout background="figma">
@@ -95,7 +93,9 @@ export default function RegisterPage() {
           />
         )}
 
-        {step === 3 && <WelcomeStep firstName={firstName} />}
+        {step === 3 && profile && (
+          <WelcomeStep profile={profile} fullName={data.fullName} />
+        )}
       </div>
     </AuthLayout>
   );
