@@ -13,6 +13,7 @@ import {
   patients,
   recentRecords,
 } from "../../../modules/demo/demoData";
+import { Link } from "react-router";
 
 export default function DoctorDashboard() {
   const today = agendaToday("medico");
@@ -42,23 +43,39 @@ export default function DoctorDashboard() {
             <tbody>
               {patients.map((patient) => (
                 <tr key={patient.id} className="border-t border-line">
-                  <td className="py-3 pr-4">
-                    <div className="flex items-center gap-3">
+                                    <td className="py-3 pr-4">
+                    <Link
+                      to={`/app/pacientes/${patient.id}`}
+                      aria-label={`Ver dados de ${patient.name}`}
+                      className="flex w-fit items-center gap-3 rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-action"
+                    >
                       <Avatar name={patient.name} tone="soft" />
                       <div>
                         <p className="text-base font-medium text-ink">{patient.name}</p>
                         <p className="text-sm text-ink-soft">{patient.age} anos</p>
                       </div>
-                    </div>
+                    </Link>
                   </td>
                   <td className="py-3 pr-4 text-base text-ink">{patient.nextAppointment}</td>
                   <td className="py-3 pr-4 text-base text-ink">
                     {patient.medsWeek.taken} de {patient.medsWeek.total}
                   </td>
                   <td className="py-3 text-right">
-                    <SmallButton to="/app/pacientes" label={`Ver ${patient.name}`}>
-                      Ver
-                    </SmallButton>
+                    <div className="flex justify-end gap-2">
+                      <SmallButton
+                        to={`/app/pacientes/${patient.id}`}
+                        label={`Ver dados de ${patient.name}`}
+                      >
+                        Ver dados
+                      </SmallButton>
+                      <SmallButton
+                        variant="solid"
+                        to={`/app/mensagens?paciente=${patient.id}`}
+                        label={`Contatar ${patient.name}`}
+                      >
+                        Contatar
+                      </SmallButton>
+                    </div>
                   </td>
                 </tr>
               ))}

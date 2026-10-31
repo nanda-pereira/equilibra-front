@@ -36,7 +36,7 @@ export default function ClinicalCaregiverDashboard() {
                 </p>
               </div>
               <div>
-                <SmallButton to="/app/pacientes" label={`Ver ${patient.name}`}>
+                <SmallButton to={`/app/pacientes/${patient.id}`} label={`Ver ${patient.name}`}>
                   Ver paciente
                 </SmallButton>
               </div>

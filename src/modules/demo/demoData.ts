@@ -149,6 +149,7 @@ export type AgendaItem = {
   title: string;
   detail: string;
   kind: AgendaKind;
+  patientId?: string;
 };
 
 function patientAgenda(): AgendaItem[] {
@@ -176,15 +177,17 @@ function patientAgenda(): AgendaItem[] {
 }
 
 const consultations = [
-  { id: "k1", offset: 0, time: "09h00", patient: "João Ferreira" },
-  { id: "k2", offset: 0, time: "14h30", patient: "Ana Souza" },
-  { id: "k3", offset: 2, time: "14h30", patient: "Maria Aparecida" },
-  { id: "k4", offset: 3, time: "11h00", patient: "Carlos Ferreira" },
-  { id: "k5", offset: 5, time: "10h00", patient: "João Ferreira" },
-  { id: "k6", offset: 7, time: "15h00", patient: "Ana Souza" },
-  { id: "k7", offset: 9, time: "09h30", patient: "Carlos Ferreira" },
-  { id: "k8", offset: -3, time: "10h00", patient: "Maria Aparecida" },
-  { id: "k9", offset: -8, time: "16h00", patient: "João Ferreira" },
+  { id: "k1", offset: 0, time: "09h00", patient: "João Ferreira", patientId: "joao" },
+  { id: "k2", offset: 0, time: "14h30", patient: "Ana Souza", patientId: "ana" },
+  { id: "k3", offset: 2, time: "14h30", patient: "Maria Aparecida", patientId: "maria" },
+  { id: "k4", offset: 3, time: "11h00", patient: "Carlos Ferreira", patientId: "carlos" },
+  { id: "k5", offset: 5, time: "10h00", patient: "João Ferreira", patientId: "joao" },
+  { id: "k6", offset: 7, time: "15h00", patient: "Ana Souza", patientId: "ana" },
+  { id: "k7", offset: 9, time: "09h30", patient: "Carlos Ferreira", patientId: "carlos" },
+  { id: "k8", offset: -3, time: "10h00", patient: "Maria Aparecida", patientId: "maria" },
+  { id: "k9", offset: -8, time: "16h00", patient: "João Ferreira", patientId: "joao" },
+  { id: "k10", offset: 1, time: "10h30", patient: "João Ferreira", patientId: "joao" },
+  { id: "k11", offset: 4, time: "16h00", patient: "Ana Souza", patientId: "ana" },
 ];
 
 function consultationsAgenda(): AgendaItem[] {
@@ -195,6 +198,7 @@ function consultationsAgenda(): AgendaItem[] {
     title: item.patient,
     detail: "Consulta de acompanhamento",
     kind: "consulta",
+    patientId: item.patientId,
   }));
 }
 
