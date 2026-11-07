@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import EmptyState from "../../components/app/EmptyState";
 import GlassCard from "../../components/app/GlassCard";
 import ListRow from "../../components/app/ListRow";
 import MonthCalendar from "../../components/app/MonthCalendar";
 import PageHeader from "../../components/app/PageHeader";
 import { CalendarIcon, ExerciseIcon } from "../../components/ui/icons";
-import { getAgendaFor, isSameDay, shortDay } from "../../modules/demo/demoData";
+import { getAgendaFor, useAppState } from "../../modules/demo/appStore";
+import { isSameDay, shortDay } from "../../modules/demo/demoData";
 import { useSession } from "../../modules/session/session";
 
 const LONG_FORMAT = new Intl.DateTimeFormat("pt-BR", {
@@ -25,8 +26,9 @@ function byDateAndTime(
 export default function AgendaPage() {
   const { session } = useSession();
   const [selected, setSelected] = useState(() => new Date());
-  const items = useMemo(() => (session ? getAgendaFor(session.profile) : []), [session]);
-
+  useAppState();
+  const items = session ? getAgendaFor(session.profile) : [];
+  
   if (!session) return null;
 
   const dayItems = items

@@ -1,11 +1,20 @@
 import Section from "../../../components/layout/Section";
+import Icon from "../../../components/ui/Icon";
 import SectionEyebrow from "../../../components/ui/SectionEyebrow";
+import {
+  ActivityIcon,
+  AnalyticsIcon,
+  BellIcon,
+  CheckCircleIcon,
+} from "../../../components/ui/icons";
 import curvaPasso12 from "../../../assets/images/curva-passo-1-2.svg";
 import curvaPasso24 from "../../../assets/images/curva-passo-2-4.svg";
+import Reveal from "../../../components/ui/Reveal";
 
 const steps = [
   {
     number: "1",
+    icon: ActivityIcon,
     title: "Coleta de dados",
     description: "O dispositivo vestível monitora os sinais motores em tempo real.",
     circle: "xl:left-[9.656%]",
@@ -13,6 +22,7 @@ const steps = [
   },
   {
     number: "2",
+    icon: AnalyticsIcon,
     title: "Análise Inteligente",
     description: "A IA identifica padrões e classifica o risco.",
     circle: "xl:left-[33.423%]",
@@ -20,6 +30,7 @@ const steps = [
   },
   {
     number: "3",
+    icon: BellIcon,
     title: "Alertas e relatórios",
     description: "Notificações são enviadas para paciente, cuidadores e médicos.",
     circle: "xl:left-[58.204%]",
@@ -27,6 +38,7 @@ const steps = [
   },
   {
     number: "4",
+    icon: CheckCircleIcon,
     title: "Acompanhamento",
     description:
       "Com o histórico, a equipe médica ajusta o tratamento e as recomendações.",
@@ -43,7 +55,7 @@ export default function HowItWorksSection() {
       bg="bg-[#f6fbfa]"
       className="xl:px-0"
     >
-      <div className="mx-auto w-full max-w-[1481px] xl:relative xl:aspect-[1481/539]">
+      <Reveal className="mx-auto w-full max-w-[1481px] xl:relative xl:aspect-[1481/539]">
         <div className="flex flex-col items-center text-center">
           <SectionEyebrow
             large
@@ -55,7 +67,7 @@ export default function HowItWorksSection() {
             Como funciona
           </SectionEyebrow>
 
-          <p className="mt-6 max-w-[632px] font-urbanist text-[22px] font-medium leading-[26px] text-[#202020] xl:absolute xl:left-1/2 xl:top-[19.67%] xl:mt-0 xl:w-[42.67%] xl:max-w-none xl:-translate-x-1/2">
+          <p className="mt-6 max-w-[632px] font-urbanist text-[20px] font-medium leading-[26px] text-[#202020] sm:text-[22px] xl:absolute xl:left-1/2 xl:top-[19.67%] xl:mt-0 xl:w-[42.67%] xl:max-w-none xl:-translate-x-1/2">
             O Equilibra trabalha com coleta de dados simples. Tudo isso visando
             o cuidado, tudo conectado.
           </p>
@@ -65,10 +77,12 @@ export default function HowItWorksSection() {
         <ol className="mt-12 grid list-none gap-12 sm:grid-cols-2 xl:mt-0 xl:block">
           {steps.map((step) => (
             <li key={step.number} className="flex flex-col items-center text-center">
-              <div
+              <span
                 aria-hidden="true"
-                className={`h-[109px] w-[108px] shrink-0 rounded-full bg-[#D9D9D9] xl:absolute xl:top-[39.7%] xl:aspect-[108/109] xl:h-auto xl:w-[7.292%] ${step.circle}`}
-              />
+                className={`flex h-[109px] w-[108px] shrink-0 items-center justify-center rounded-full bg-mint-100 text-action shadow-[0_8px_24px_rgba(36,116,119,0.12)] xl:absolute xl:top-[39.7%] xl:aspect-[108/109] xl:h-auto xl:w-[7.292%] ${step.circle}`}
+              >
+                <Icon icon={step.icon} size={44} />
+              </span>
 
               <div
                 className={`mt-6 w-full max-w-[235px] xl:absolute xl:top-[68.65%] xl:mt-0 xl:w-[15.87%] xl:max-w-none xl:-translate-x-1/2 ${step.text}`}
@@ -77,7 +91,7 @@ export default function HowItWorksSection() {
                 <h3 className="relative inline-block font-urbanist text-[22px] font-medium leading-[26px] text-[#202020]">
                   <span
                     aria-hidden="true"
-                    className="absolute right-full top-0 mr-5 text-[32px] leading-[26px] text-[#539492]"
+                    className="mr-3 inline-block text-[32px] leading-[26px] text-[#539492] xl:absolute xl:right-full xl:top-0 xl:mr-5"
                   >
                     {step.number}
                   </span>
@@ -108,7 +122,7 @@ export default function HowItWorksSection() {
             <img src={curvaPasso24} alt="" className="block size-full max-w-none" />
           </div>
         </div>
-      </div>
+      </Reveal>
     </Section>
   );
 }

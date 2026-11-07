@@ -1,21 +1,30 @@
-import { useMemo, useState } from "react";
+import { useState, type FormEvent } from "react";
 import Avatar from "../../components/app/Avatar";
 import EmptyState from "../../components/app/EmptyState";
 import GlassCard from "../../components/app/GlassCard";
 import ListRow from "../../components/app/ListRow";
 import MetricCard from "../../components/app/MetricCard";
+import Modal from "../../components/app/Modal";
 import MonthCalendar from "../../components/app/MonthCalendar";
 import PageHeader from "../../components/app/PageHeader";
+import PatientFilter from "../../components/app/PatientFilter";
 import SmallButton from "../../components/app/SmallButton";
+import Input from "../../components/ui/Input";
+import Select from "../../components/ui/Select";
 import { CalendarIcon, ClockIcon, PatientsIcon } from "../../components/ui/icons";
+import { addConsultation, getAgendaFor, useAppState } from "../../modules/demo/appStore";
 import {
+  PATIENTS_BASE,
   addDays,
-  getAgendaFor,
+  fromISO,
   isSameDay,
-  patients,
+  longDayLabel,
   shortDay,
+  toISO,
   type AgendaItem,
 } from "../../modules/demo/demoData";
+
+const TYPES = ["Consulta de acompanhamento", "Consulta de retorno", "Primeira consulta"];
 
 const LONG_FORMAT = new Intl.DateTimeFormat("pt-BR", {
   weekday: "long",
@@ -29,17 +38,20 @@ const byDateAndTime = (a: AgendaItem, b: AgendaItem) =>
   a.date.getTime() - b.date.getTime() || a.time.localeCompare(b.time);
 
 export default function DoctorAgendaPage() {
-  const allItems = useMemo(() => getAgendaFor("medico"), []);
+  useAppState();
   const [patientFilter, setPatientFilter] = useState("all");
   const [selected, setSelected] = useState(() => new Date());
+  const [open, setOpen] = useState(false);
+  const [patient, setPatient] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [type, setType] = useState(TYPES[0]);
+  const [submitted, setSubmitted] = useState(false);
+  const [flash, setFlash] = useState("");
 
-  const items = useMemo(
-    () =>
-      patientFilter === "all"
-        ? allItems
-        : allItems.filter((item) => item.patientId === patientFilter),
-    [allItems, patientFilter],
-  );
+  const allItems = getAgendaFor("medico");
+  const items =
+    patientFilter === "all" ? allItems : allItems.filter((item) => item.patientId === patientFilter);
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -47,26 +59,65 @@ export default function DoctorAgendaPage() {
   endOfWeek.setHours(23, 59, 59, 999);
 
   const todayCount = items.filter((item) => isSameDay(item.date, new Date())).length;
-  const weekCount = items.filter(
-    (item) => item.date >= startOfToday && item.date <= endOfWeek,
-  ).length;
+  const weekCount = items.filter((item) => item.date >= startOfToday && item.date <= endOfWeek).length;
   const upcoming = items.filter((item) => item.date >= startOfToday).sort(byDateAndTime);
   const next = upcoming[0];
 
-  const dayItems = items
-    .filter((item) => isSameDay(item.date, selected))
-    .sort(byDateAndTime);
+  const dayItems = items.filter((item) => isSameDay(item.date, selected)).sort(byDateAndTime);
   const dayHours = dayItems.map((item) => hourOf(item.time));
   const firstHour = Math.min(8, ...dayHours);
   const lastHour = Math.max(18, ...dayHours);
   const hours = Array.from({ length: lastHour - firstHour + 1 }, (_, i) => firstHour + i);
-
   const selectedText = LONG_FORMAT.format(selected);
   const selectedTitle = selectedText.charAt(0).toUpperCase() + selectedText.slice(1);
 
+  const todayISO = toISO(new Date());
+  const timeKey = time.replace(":", "h");
+  const errors = {
+    patient: patient ? undefined : "Selecione uma opção",
+    date: !date ? "Campo obrigatório" : date < todayISO ? "A data não pode ser anterior a hoje" : undefined,
+    time: !time
+      ? "Campo obrigatório"
+      : date && allItems.some((item) => isSameDay(item.date, fromISO(date)) && item.time === timeKey)
+        ? "Já existe uma consulta neste horário"
+        : undefined,
+  };
+
+  const startNew = () => {
+    setPatient("");
+    setDate(toISO(selected) < todayISO ? todayISO : toISO(selected));
+    setTime("");
+    setType(TYPES[0]);
+    setSubmitted(false);
+    setFlash("");
+    setOpen(true);
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubmitted(true);
+    const target = PATIENTS_BASE.find((item) => item.name === patient);
+    if (errors.patient || errors.date || errors.time || !target) return;
+
+    addConsultation({ patientId: target.id, dateISO: date, time, detail: type });
+    setSelected(fromISO(date));
+    setOpen(false);
+    setFlash(`Consulta de ${target.name} agendada para ${longDayLabel(fromISO(date), timeKey)}.`);
+  };
+
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Agenda" subtitle="Suas consultas" demo />
+      <PageHeader title="Agenda" subtitle="Suas consultas" demo>
+        <SmallButton variant="solid" onClick={startNew}>
+          Nova consulta
+        </SmallButton>
+      </PageHeader>
+
+      {flash && (
+        <p role="status" className="rounded-[20px] bg-success-bg px-4 py-3 text-sm text-success-text">
+          {flash} Como é uma demonstração, os dados não são enviados a um servidor.
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
         <MetricCard icon={ClockIcon} label="Consultas hoje" value={String(todayCount)} />
@@ -85,31 +136,17 @@ export default function DoctorAgendaPage() {
       </div>
 
       <GlassCard title="Filtrar por paciente">
-        <div role="group" aria-label="Filtrar por paciente" className="flex flex-wrap gap-2.5">
-          {[{ id: "all", name: "Todos" }, ...patients].map((option) => {
-            const active = patientFilter === option.id;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                aria-pressed={active}
-                onClick={() => setPatientFilter(option.id)}
-                className={`inline-flex h-10 items-center rounded-full px-5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action ${
-                  active
-                    ? "bg-action text-white shadow-[0_8px_20px_rgba(36,116,119,0.25)]"
-                    : "border border-brand text-action hover:bg-mint-100"
-                }`}
-              >
-                {option.name}
-              </button>
-            );
-          })}
-        </div>
+        <PatientFilter value={patientFilter} onChange={setPatientFilter} includeAll />
       </GlassCard>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1.1fr]">
         <GlassCard className="sm:p-8">
-          <MonthCalendar items={items} selected={selected} onSelect={setSelected} />
+          <MonthCalendar
+            key={`${selected.getFullYear()}-${selected.getMonth()}`}
+            items={items}
+            selected={selected}
+            onSelect={setSelected}
+          />
         </GlassCard>
 
         <GlassCard title={selectedTitle} description="Agenda do dia">
@@ -122,11 +159,9 @@ export default function DoctorAgendaPage() {
                 return (
                   <li
                     key={hour}
-                    className="grid grid-cols-[44px_1fr] gap-3 border-t border-line py-2 first:border-t-0"
+                    className="grid grid-cols-[40px_1fr] gap-3 border-t border-line py-2 first:border-t-0"
                   >
-                    <span className="pt-2 text-sm text-ink-soft">
-                      {String(hour).padStart(2, "0")}h
-                    </span>
+                    <span className="pt-2 text-sm text-ink-soft">{String(hour).padStart(2, "0")}h</span>
                     <div className="flex min-h-11 flex-col gap-2">
                       {rowItems.map((item) => (
                         <div
@@ -142,10 +177,7 @@ export default function DoctorAgendaPage() {
                           </div>
                           {item.patientId && (
                             <div className="flex flex-wrap gap-2">
-                              <SmallButton
-                                to={`/app/pacientes/${item.patientId}`}
-                                label={`Ver dados de ${item.title}`}
-                              >
+                              <SmallButton to={`/app/pacientes/${item.patientId}`} label={`Ver dados de ${item.title}`}>
                                 Ver paciente
                               </SmallButton>
                               <SmallButton
@@ -181,10 +213,7 @@ export default function DoctorAgendaPage() {
                 subtitle={`${shortDay(item.date)} · ${item.time} · ${item.detail}`}
                 trailing={
                   item.patientId ? (
-                    <SmallButton
-                      to={`/app/pacientes/${item.patientId}`}
-                      label={`Ver dados de ${item.title}`}
-                    >
+                    <SmallButton to={`/app/pacientes/${item.patientId}`} label={`Ver dados de ${item.title}`}>
                       Ver paciente
                     </SmallButton>
                   ) : undefined
@@ -194,6 +223,42 @@ export default function DoctorAgendaPage() {
           </ul>
         )}
       </GlassCard>
+
+      <Modal open={open} title="Nova consulta" onClose={() => setOpen(false)}>
+        <form noValidate onSubmit={handleSubmit}>
+          <Select
+            label="Paciente"
+            options={PATIENTS_BASE.map((item) => item.name)}
+            value={patient}
+            onChange={(e) => setPatient(e.target.value)}
+            error={submitted ? errors.patient : undefined}
+          />
+          <div className="grid gap-x-6 sm:grid-cols-2">
+            <Input
+              label="Data"
+              type="date"
+              min={todayISO}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              error={submitted ? errors.date : undefined}
+            />
+            <Input
+              label="Horário"
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              error={submitted ? errors.time : undefined}
+            />
+          </div>
+          <Select label="Tipo" options={TYPES} value={type} onChange={(e) => setType(e.target.value)} />
+          <div className="mt-2 flex flex-wrap gap-3">
+            <SmallButton type="submit" variant="solid">
+              Agendar consulta
+            </SmallButton>
+            <SmallButton onClick={() => setOpen(false)}>Cancelar</SmallButton>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

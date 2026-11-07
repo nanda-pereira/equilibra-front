@@ -27,16 +27,18 @@ const evolution: NavItem = { path: "evolucao-clinica", label: "Evolução clíni
 const myProfile: NavItem = { path: "perfil", label: "Meu perfil", icon: ProfileIcon };
 const settings: NavItem = { path: "configuracoes", label: "Configurações", icon: SettingsIcon };
 
+const bottom = [myProfile, settings];
+
 export const NAV_BY_PROFILE: Record<ProfileType, NavConfig> = {
-  paciente: { main: [home, monitoring, medications, exercises, agenda, messages], bottom: [myProfile] },
-  medico: { main: [home, patients, agenda, evolution, reports, messages], bottom: [settings] },
-  "cuidador-clinico": { main: [home, patients, monitoring, medications, agenda, reports], bottom: [myProfile] },
-  "cuidador-domiciliar": { main: [home, medications, exercises, agenda], bottom: [myProfile] },
+  paciente: { main: [home, monitoring, medications, exercises, agenda, messages], bottom },
+  medico: { main: [home, patients, agenda, evolution, reports, messages], bottom },
+  "cuidador-clinico": { main: [home, patients, monitoring, medications, agenda, reports], bottom },
+  "cuidador-domiciliar": { main: [home, medications, exercises, agenda], bottom },
 };
 
 export function findNavLabel(profile: ProfileType, path: string) {
-  const { main, bottom } = NAV_BY_PROFILE[profile];
-  const found = [...main, ...bottom].find((item) => item.path === path);
+  const { main, bottom: footer } = NAV_BY_PROFILE[profile];
+  const found = [...main, ...footer].find((item) => item.path === path);
   if (found) return found.label;
   const text = path.replace(/-/g, " ");
   return text.charAt(0).toUpperCase() + text.slice(1);

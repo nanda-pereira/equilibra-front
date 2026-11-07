@@ -6,32 +6,28 @@ import GlassCard from "../../components/app/GlassCard";
 import PageHeader from "../../components/app/PageHeader";
 import SmallButton from "../../components/app/SmallButton";
 import Input from "../../components/ui/Input";
-import { patients } from "../../modules/demo/demoData";
+import { getPatientSummaries, useAppState } from "../../modules/demo/appStore";
 import { useSession } from "../../modules/session/session";
 
-const plain = (text: string) =>
-  text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+const plain = (text: string) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
 export default function PatientsPage() {
   const { session } = useSession();
   const [query, setQuery] = useState("");
+  useAppState();
 
   if (!session) return null;
   if (session.profile !== "medico" && session.profile !== "cuidador-clinico") {
     return <Navigate to="/app/inicio" replace />;
   }
 
-  const filtered = patients.filter((patient) =>
+  const filtered = getPatientSummaries().filter((patient) =>
     plain(patient.name).includes(plain(query.trim())),
   );
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Pacientes"
-        subtitle="Pacientes sob sua responsabilidade"
-        demo
-      />
+      <PageHeader title="Pacientes" subtitle="Pacientes sob sua responsabilidade" demo />
 
       <GlassCard>
         <div className="max-w-md">
@@ -50,10 +46,7 @@ export default function PatientsPage() {
 
       {filtered.length === 0 ? (
         <GlassCard>
-          <EmptyState
-            title="Nenhum paciente encontrado"
-            description="Confira o nome digitado e tente novamente."
-          />
+          <EmptyState title="Nenhum paciente encontrado" description="Confira o nome digitado e tente novamente." />
         </GlassCard>
       ) : (
         <ul className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">

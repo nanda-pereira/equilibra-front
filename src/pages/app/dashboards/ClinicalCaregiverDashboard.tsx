@@ -1,4 +1,6 @@
+// import AssistantCard from "../../../components/app/AssistantCard";
 import Avatar from "../../../components/app/Avatar";
+import EmptyState from "../../../components/app/EmptyState";
 import GlassCard from "../../../components/app/GlassCard";
 import ListRow from "../../../components/app/ListRow";
 import PageHeader from "../../../components/app/PageHeader";
@@ -7,16 +9,26 @@ import { BarTrendChart } from "../../../components/app/charts";
 import { ExerciseIcon, MedicineIcon, MessageIcon } from "../../../components/ui/icons";
 import {
   appointmentsNextDays,
-  patients,
-  pendingExercises,
-  recentRecords,
-  upcomingMeds,
-} from "../../../modules/demo/demoData";
+  dosesToday,
+  getPatientSummaries,
+  recordsAll,
+  useAppState,
+} from "../../../modules/demo/appStore";
+import { pendingExercises } from "../../../modules/demo/demoData";
 
 export default function ClinicalCaregiverDashboard() {
+  useAppState();
+  const patients = getPatientSummaries();
+  const week = appointmentsNextDays();
+  const records = recordsAll().slice(0, 3);
+  const pendingMeds = patients
+    .map((patient) => ({ patient, dose: dosesToday(patient.id).find((item) => !item.taken) }))
+    .filter((item) => item.dose);
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader demo />
+      {/* <AssistantCard /> */}
 
       <GlassCard title="Pacientes vinculados" action={<SmallButton to="/app/pacientes">Ver todos</SmallButton>}>
         <ul className="grid gap-4 sm:grid-cols-2">
@@ -46,17 +58,23 @@ export default function ClinicalCaregiverDashboard() {
       </GlassCard>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <GlassCard title="Próximos medicamentos">
-          <ul className="flex flex-col gap-3">
-            {upcomingMeds.map((med) => (
-              <ListRow
-                key={med.id}
-                icon={MedicineIcon}
-                title={`${med.patient} · ${med.name}`}
-                subtitle={`Horário: ${med.time}`}
-              />
-            ))}
-          </ul>
+        <GlassCard title="Próximos medicamentos" action={<SmallButton to="/app/medicamentos">Ver todos</SmallButton>}>
+          {pendingMeds.length === 0 ? (
+            <EmptyState title="Todos os horários de hoje foram registrados" />
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {pendingMeds.map(({ patient, dose }) =>
+                dose ? (
+                  <ListRow
+                    key={patient.id}
+                    icon={MedicineIcon}
+                    title={`${patient.name} · ${dose.name}`}
+                    subtitle={`Horário: ${dose.time}`}
+                  />
+                ) : null,
+              )}
+            </ul>
+          )}
         </GlassCard>
 
         <GlassCard title="Exercícios pendentes">
@@ -76,23 +94,21 @@ export default function ClinicalCaregiverDashboard() {
       <div className="grid gap-6 xl:grid-cols-2">
         <GlassCard title="Consultas nos próximos 7 dias" description="Pacientes vinculados">
           <BarTrendChart
-            data={appointmentsNextDays}
+            data={week}
             xKey="day"
             yKey="appointments"
             seriesName="Consultas"
-            summary={`Consultas nos próximos 7 dias: ${appointmentsNextDays
-              .map((item) => `${item.day}, ${item.appointments}`)
-              .join("; ")}.`}
+            summary={`Consultas nos próximos 7 dias: ${week.map((item) => `${item.day}, ${item.appointments}`).join("; ")}.`}
           />
         </GlassCard>
 
         <GlassCard title="Registros recentes">
           <ul className="flex flex-col gap-3">
-            {recentRecords.map((record) => (
+            {records.map((record) => (
               <ListRow
                 key={record.id}
                 icon={MessageIcon}
-                title={`${record.patient} · ${record.text}`}
+                title={`${record.patientName} · ${record.text}`}
                 subtitle={`${record.author} · ${record.when}`}
               />
             ))}

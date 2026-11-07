@@ -1,4 +1,17 @@
+import Icon from "./ui/Icon";
 import Logo from "./ui/Logo";
+import { InstagramIcon, MailIcon, YoutubeIcon } from "./ui/icons";
+
+// TODO: preencher o href quando existirem os destinos
+// (e-mail: "mailto:contato@..."; YouTube e Instagram: URL do canal e do perfil)
+const socials: { label: string; icon: typeof MailIcon; href?: string }[] = [
+  { label: "E-mail", icon: MailIcon },
+  { label: "YouTube", icon: YoutubeIcon },
+  { label: "Instagram", icon: InstagramIcon },
+];
+
+const circle =
+  "flex size-11 items-center justify-center rounded-full bg-mint-100 text-action";
 
 export default function Footer() {
   return (
@@ -8,13 +21,25 @@ export default function Footer() {
           <Logo />
         </a>
 
-        <ul aria-label="Redes sociais" className="flex items-center gap-5">
-          {[0, 1, 2].map((item) => (
-            <li
-              key={item}
-              aria-hidden="true"
-              className="h-[19px] w-[19px] rounded-full bg-[#D9D9D9]"
-            />
+        <ul aria-label="Contato e redes sociais" className="flex items-center gap-4">
+          {socials.map(({ label, icon, href }) => (
+            <li key={label}>
+              {href ? (
+                <a
+                  href={href}
+                  aria-label={label}
+                  target={href.startsWith("http") ? "_blank" : undefined}
+                  rel="noopener noreferrer"
+                  className={`${circle} transition-colors hover:bg-mint-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action`}
+                >
+                  <Icon icon={icon} size={22} />
+                </a>
+              ) : (
+                <span role="img" aria-label={`${label} (em breve)`} className={circle}>
+                  <Icon icon={icon} size={22} />
+                </span>
+              )}
+            </li>
           ))}
         </ul>
 

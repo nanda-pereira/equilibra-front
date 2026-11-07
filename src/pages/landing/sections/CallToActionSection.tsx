@@ -1,6 +1,7 @@
 import Button from "../../../components/ui/Button";
 import mockupApp from "../../../assets/images/mockup-app.png";
 import brilhoCta from "../../../assets/images/brilho-cta.svg";
+import Reveal from "../../../components/ui/Reveal";
 
 export default function CallToActionSection() {
   return (
@@ -9,8 +10,7 @@ export default function CallToActionSection() {
       aria-labelledby="cta-title"
       className="overflow-hidden bg-[#164e4f] px-6 pt-14 md:px-12 xl:px-0 xl:pt-0"
     >
-      <div className="mx-auto w-full max-w-[1481px] xl:relative xl:aspect-[1481/421]">
-        <h2
+      <Reveal className="mx-auto w-full max-w-[1481px] xl:relative xl:aspect-[1481/421]">        <h2
           id="cta-title"
           className="text-[30px] font-semibold leading-[1.21] text-[#f5f5f5] xl:absolute xl:left-[6.955%] xl:top-[21.14%] xl:w-[42%] xl:text-[clamp(30px,2.566vw,38px)]"
         >
@@ -24,7 +24,7 @@ export default function CallToActionSection() {
         </p>
 
         <div className="mt-8 xl:absolute xl:left-[6.955%] xl:top-[69.83%] xl:mt-0">
-          <Button href="#" variant="cta" withArrow>
+          <Button href="/cadastro" variant="cta" withArrow>
             Comece já!
           </Button>
         </div>
@@ -45,7 +45,7 @@ export default function CallToActionSection() {
             className="absolute left-0 top-0 h-auto w-full max-w-none"
           />
         </div>
-      </div>
+      </Reveal>
     </section>
   );
 }

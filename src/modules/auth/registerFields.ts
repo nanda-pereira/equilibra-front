@@ -20,11 +20,10 @@ export type ProfileForm = {
   sharesHealthData: boolean;
 };
 
-// TODO: listas PROVISÓRIAS; confirmar com o backend se é lista fechada
-const DOCTOR_SPECIALTIES = ["Neurologia", "Geriatria", "Clínica geral", "Fisiatria"];
+export const DOCTOR_SPECIALTIES = ["Neurologia", "Geriatria", "Clínica geral", "Fisiatria"];
 
 // Áreas citadas no relatório (seção 2.3)
-const CAREGIVER_ROLES = [
+export const CAREGIVER_ROLES = [
   "Enfermagem",
   "Fisioterapia",
   "Terapia ocupacional",
@@ -47,8 +46,7 @@ const confirmPassword: FieldConfig = {
   placeholder: "••••••••",
 };
 
-// TODO: campos de médico e cuidadores são PROVISÓRIOS (RF02/RF03 do grupo, que
-// têm inconsistências). Confirmar com o backend e com o Figma.
+// TODO: campos de médico e cuidadores são PROVISÓRIOS (RF02/RF03 do grupo, que têm inconsistências). Confirmar com o backend e com o Figma.
 export const PROFILE_FORM: Record<ProfileType, ProfileForm> = {
   paciente: {
     columns: 3,

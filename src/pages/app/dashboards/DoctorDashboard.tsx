@@ -1,3 +1,5 @@
+import { Link } from "react-router";
+// import AssistantCard from "../../../components/app/AssistantCard";
 import Avatar from "../../../components/app/Avatar";
 import EmptyState from "../../../components/app/EmptyState";
 import GlassCard from "../../../components/app/GlassCard";
@@ -10,26 +12,58 @@ import { CalendarIcon, ClockIcon, MessageIcon, PatientsIcon } from "../../../com
 import {
   agendaToday,
   appointmentsNextDays,
-  patients,
-  recentRecords,
-} from "../../../modules/demo/demoData";
-import { Link } from "react-router";
+  getPatientSummaries,
+  recordsAll,
+  useAppState,
+} from "../../../modules/demo/appStore";
 
 export default function DoctorDashboard() {
+  useAppState();
+  const patients = getPatientSummaries();
   const today = agendaToday("medico");
+  const week = appointmentsNextDays();
+  const records = recordsAll().slice(0, 4);
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader demo />
+      {/* <AssistantCard /> */}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
         <MetricCard icon={PatientsIcon} label="Pacientes sob responsabilidade" value={String(patients.length)} />
         <MetricCard icon={CalendarIcon} label="Consultas hoje" value={String(today.length)} />
-        <MetricCard icon={MessageIcon} label="Registros recentes" value={String(recentRecords.length)} />
+        <MetricCard icon={MessageIcon} label="Registros recentes" value={String(records.length)} />
       </div>
 
       <GlassCard title="Pacientes" action={<SmallButton to="/app/pacientes">Ver todos</SmallButton>}>
-        <div className="overflow-x-auto">
+        {/* Celular: cartões */}
+        <ul className="flex flex-col gap-3 md:hidden">
+          {patients.map((patient) => (
+            <li key={patient.id} className="flex flex-col gap-3 rounded-[20px] bg-mint-100/70 p-4">
+              <Link
+                to={`/app/pacientes/${patient.id}`}
+                aria-label={`Ver dados de ${patient.name}`}
+                className="flex items-center gap-3 rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-action"
+              >
+                <Avatar name={patient.name} tone="soft" className="bg-white!" />
+                <div>
+                  <p className="text-base font-medium text-ink">{patient.name}</p>
+                  <p className="text-sm text-ink-soft">{patient.age} anos</p>
+                </div>
+              </Link>
+              <p className="text-sm text-ink-soft">Próxima consulta: {patient.nextAppointment}</p>
+              <div className="flex flex-wrap gap-2">
+                <SmallButton to={`/app/pacientes/${patient.id}`}>Ver dados</SmallButton>
+                <SmallButton variant="solid" to={`/app/mensagens?paciente=${patient.id}`} label={`Contatar ${patient.name}`}>
+                  Contatar
+                </SmallButton>
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        {/* Tablet e desktop: tabela */}
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[640px] text-left">
             <caption className="sr-only">Pacientes sob responsabilidade</caption>
             <thead>
@@ -43,7 +77,7 @@ export default function DoctorDashboard() {
             <tbody>
               {patients.map((patient) => (
                 <tr key={patient.id} className="border-t border-line">
-                                    <td className="py-3 pr-4">
+                  <td className="py-3 pr-4">
                     <Link
                       to={`/app/pacientes/${patient.id}`}
                       aria-label={`Ver dados de ${patient.name}`}
@@ -62,17 +96,10 @@ export default function DoctorDashboard() {
                   </td>
                   <td className="py-3 text-right">
                     <div className="flex justify-end gap-2">
-                      <SmallButton
-                        to={`/app/pacientes/${patient.id}`}
-                        label={`Ver dados de ${patient.name}`}
-                      >
+                      <SmallButton to={`/app/pacientes/${patient.id}`} label={`Ver dados de ${patient.name}`}>
                         Ver dados
                       </SmallButton>
-                      <SmallButton
-                        variant="solid"
-                        to={`/app/mensagens?paciente=${patient.id}`}
-                        label={`Contatar ${patient.name}`}
-                      >
+                      <SmallButton variant="solid" to={`/app/mensagens?paciente=${patient.id}`} label={`Contatar ${patient.name}`}>
                         Contatar
                       </SmallButton>
                     </div>
@@ -87,13 +114,11 @@ export default function DoctorDashboard() {
       <div className="grid gap-6 xl:grid-cols-2">
         <GlassCard title="Consultas nos próximos 7 dias">
           <BarTrendChart
-            data={appointmentsNextDays}
+            data={week}
             xKey="day"
             yKey="appointments"
             seriesName="Consultas"
-            summary={`Consultas nos próximos 7 dias: ${appointmentsNextDays
-              .map((item) => `${item.day}, ${item.appointments}`)
-              .join("; ")}.`}
+            summary={`Consultas nos próximos 7 dias: ${week.map((item) => `${item.day}, ${item.appointments}`).join("; ")}.`}
           />
         </GlassCard>
 
@@ -103,25 +128,20 @@ export default function DoctorDashboard() {
           ) : (
             <ul className="flex flex-col gap-3">
               {today.map((item) => (
-                <ListRow
-                  key={item.id}
-                  icon={ClockIcon}
-                  title={item.title}
-                  subtitle={`${item.detail} · ${item.time}`}
-                />
+                <ListRow key={item.id} icon={ClockIcon} title={item.title} subtitle={`${item.detail} · ${item.time}`} />
               ))}
             </ul>
           )}
         </GlassCard>
       </div>
 
-      <GlassCard title="Registros recentes">
+      <GlassCard title="Registros recentes" action={<SmallButton to="/app/evolucao-clinica">Ver todos</SmallButton>}>
         <ul className="flex flex-col gap-3">
-          {recentRecords.map((record) => (
+          {records.map((record) => (
             <ListRow
               key={record.id}
               icon={MessageIcon}
-              title={`${record.patient} · ${record.text}`}
+              title={`${record.patientName} · ${record.text}`}
               subtitle={`${record.author} · ${record.when}`}
             />
           ))}

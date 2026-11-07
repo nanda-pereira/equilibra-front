@@ -16,11 +16,11 @@ export default function GlassCard({
   className = "",
 }: GlassCardProps) {
   return (
-    <section className={`glass-card rounded-3xl p-6 ${className}`}>
+    <section className={`glass-card rounded-3xl p-4 sm:p-6 ${className}`}>
       {(title || action) && (
-        <header className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            {title && <h2 className="text-xl font-medium text-deep">{title}</h2>}
+        <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            {title && <h2 className="text-lg font-medium text-deep sm:text-xl">{title}</h2>}
             {description && <p className="mt-1 text-sm text-ink-soft">{description}</p>}
           </div>
           {action}

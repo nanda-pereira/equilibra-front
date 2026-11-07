@@ -6,8 +6,8 @@ type SmallButtonProps = {
   to?: string;
   onClick?: () => void;
   variant?: "solid" | "outline";
-  /** nome acessível quando o texto do botão sozinho não basta */
   label?: string;
+  type?: "button" | "submit";
 };
 
 export default function SmallButton({
@@ -16,8 +16,9 @@ export default function SmallButton({
   onClick,
   variant = "outline",
   label,
+  type = "button",
 }: SmallButtonProps) {
-  const classes = `inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-full px-5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action ${
+  const classes = `inline-flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-full px-5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action ${
     variant === "solid"
       ? "bg-action text-white hover:bg-action-hover"
       : "border border-brand text-action hover:bg-mint-100"
@@ -32,7 +33,7 @@ export default function SmallButton({
   }
 
   return (
-    <button type="button" onClick={onClick} aria-label={label} className={classes}>
+    <button type={type} onClick={onClick} aria-label={label} className={classes}>
       {children}
     </button>
   );

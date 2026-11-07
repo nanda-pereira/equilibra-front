@@ -34,8 +34,8 @@ export default function PageHeader({ title, subtitle, demo = false, children }: 
 
   return (
     <header className="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 className="text-[28px] font-medium leading-tight text-deep md:text-[32px]">
+      <div className="min-w-0">
+        <h1 className="break-words text-2xl font-medium leading-tight text-deep sm:text-[28px] md:text-[32px]">
           {title ?? `${greeting(now)}, ${firstName}`}
         </h1>
         <p className="mt-1 text-sm text-ink-soft">{subtitle ?? longDate(now)}</p>
@@ -47,7 +47,7 @@ export default function PageHeader({ title, subtitle, demo = false, children }: 
           </span>
         )}
         {children}
-        <Avatar name={name} />
+        <Avatar name={name} className="hidden sm:flex" />
       </div>
     </header>
   );

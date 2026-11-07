@@ -17,8 +17,7 @@ export type PatientEditable = Pick<
 
 export const STAGES = ["Inicial", "Intermediário", "Avançado"];
 
-// Dados fictícios de demonstração
-const records: Record<string, PatientRecord> = {
+export const PATIENT_SEEDS: Record<string, PatientRecord> = {
   maria: {
     id: "maria",
     name: "Maria Aparecida",
@@ -64,13 +63,3 @@ const records: Record<string, PatientRecord> = {
     notes: "",
   },
 };
-
-export function getPatientRecord(id: string) {
-  return records[id] as PatientRecord | undefined;
-}
-
-export function updatePatientRecord(id: string, patch: PatientEditable) {
-  const current = records[id];
-  if (!current) return;
-  records[id] = { ...current, ...patch };
-}
