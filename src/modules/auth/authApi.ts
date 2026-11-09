@@ -1,6 +1,5 @@
-import { PROFILE_FORM } from "./registerFields";
+
 import type { ProfileType, RegisterData } from "./types";
-import { brDateToIso, onlyDigits } from "./validation";
 
 export class ApiError extends Error {
   status?: number;
@@ -12,44 +11,85 @@ export class ApiError extends Error {
   }
 }
 
-// PROVISÓRIO: rota, nomes de campos e formatos ainda não confirmados com o backend.
 const API_URL: string | undefined = import.meta.env.VITE_API_URL;
 const REGISTER_PATH = "/auth/register";
 
-export function buildRegisterPayload(profile: ProfileType, data: RegisterData) {
-  const payload: Record<string, string | boolean> = {
-    role: profile,
-    consent: data.consent,
+type BackendRole =
+  | "PATIENT"
+  | "PROFESSIONAL"
+  | "NEUROLOGIST"
+  | "CLINICAL_CAREGIVER"
+  | "HOME_CAREGIVER";
+
+export type RegisterResponseData = {
+  user?: {
+    id: string;
+    fullName: string;
+    email: string;
+    role: BackendRole;
+    emailVerified?: boolean;
   };
+  accessToken?: string;
+  refreshToken?: string;
+  emailVerificationDevToken?: string;
+};
 
-  for (const field of PROFILE_FORM[profile].fields) {
-    if (field.key === "confirmPassword") continue;
+type RegisterResponse = {
+  success?: boolean;
+  data?: RegisterResponseData;
+  message?: string | string[];
+  error?: {
+    message?: string | string[];
+  };
+};
 
-    const value = data[field.key];
-    if (field.kind === "password") payload[field.key] = value; // senha nunca é alterada
-    else if (field.kind === "cpf") payload[field.key] = onlyDigits(value);
-    else if (field.kind === "date") payload[field.key] = brDateToIso(value);
-    else payload[field.key] = value.trim();
-  }
+const ROLE_MAP: Record<ProfileType, BackendRole> = {
+  paciente: "PATIENT",
+  medico: "PROFESSIONAL",
+  "cuidador-clinico": "CLINICAL_CAREGIVER",
+  "cuidador-domiciliar": "HOME_CAREGIVER",
+};
 
-  return payload;
+export function buildRegisterPayload(
+  profile: ProfileType,
+  data: RegisterData,
+) {
+  return {
+    fullName: data.fullName.trim(),
+    email: data.email.trim().toLowerCase(),
+    password: data.password,
+    role: ROLE_MAP[profile],
+  };
 }
 
 async function mockRegister(data: RegisterData) {
   await new Promise((resolve) => setTimeout(resolve, 900));
-  // só para testar o estado de erro da interface
+
   if (data.email.trim().toLowerCase() === "erro@teste.com") {
-    throw new ApiError("Não foi possível criar a conta agora. Tente novamente.");
+    throw new ApiError(
+      "Não foi possível criar a conta agora. Tente novamente.",
+    );
   }
 }
 
-export async function registerUser(profile: ProfileType, data: RegisterData) {
+function getErrorMessage(
+  message: string | string[] | undefined,
+): string | undefined {
+  if (Array.isArray(message)) return message.join(" ");
+  return message;
+}
+
+export async function registerUser(
+  profile: ProfileType,
+  data: RegisterData,
+): Promise<RegisterResponseData | undefined> {
   if (!API_URL) {
     await mockRegister(data);
     return;
   }
 
   let response: Response;
+
   try {
     response = await fetch(`${API_URL}${REGISTER_PATH}`, {
       method: "POST",
@@ -58,15 +98,71 @@ export async function registerUser(profile: ProfileType, data: RegisterData) {
     });
   } catch {
     throw new ApiError(
-      "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.",
+      "Não foi possível conectar ao servidor. Verifique se a API está ativa.",
     );
   }
 
-  if (!response.ok) {
-    // TODO: ler a mensagem de erro do backend quando o formato for confirmado
+  const result = (await response.json().catch(() => null)) as
+    | RegisterResponse
+    | null;
+
+  if (!response.ok || !result?.success || !result.data) {
+    const message =
+      getErrorMessage(result?.error?.message) ??
+      getErrorMessage(result?.message);
+
     throw new ApiError(
-      "Não foi possível criar a conta. Confira os dados e tente novamente.",
+      message ??
+        (response.status === 409
+          ? "Já existe uma conta cadastrada com este e-mail."
+          : "Não foi possível criar a conta. Confira os dados e tente novamente."),
       response.status,
     );
   }
+
+  return result.data;
+}
+
+
+export async function verifyEmail(token: string): Promise<void> {
+  if (!API_URL) {
+    throw new ApiError(
+      "A verificação de e-mail exige conexão com o servidor.",
+    );
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_URL}/auth/verify-email`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token }),
+    });
+  } catch {
+    throw new ApiError(
+      "Não foi possível conectar ao servidor. Tente novamente.",
+    );
+  }
+
+  if (response.ok) {
+    // O backend responde HTTP 204, sem conteúdo.
+    return;
+  }
+
+  const result = (await response.json().catch(() => null)) as {
+    error?: { message?: string | string[] };
+    message?: string | string[];
+  } | null;
+
+  const message =
+    getErrorMessage(result?.error?.message) ??
+    getErrorMessage(result?.message);
+
+  throw new ApiError(
+    message ?? "Não foi possível verificar o e-mail. Confira o token.",
+    response.status,
+  );
 }

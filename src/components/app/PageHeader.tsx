@@ -23,13 +23,14 @@ type PageHeaderProps = {
   title?: string;
   subtitle?: string;
   demo?: boolean;
+  name?: string;
   children?: ReactNode;
 };
 
-export default function PageHeader({ title, subtitle, demo = false, children }: PageHeaderProps) {
+export default function PageHeader({ title, subtitle, demo = false, name: nameOverride, children }: PageHeaderProps) {
   const { session } = useSession();
   const now = new Date();
-  const name = session?.name ?? "";
+  const name = nameOverride ?? session?.name ?? "";
   const firstName = name.split(" ")[0] ?? "";
 
   return (
