@@ -46,9 +46,16 @@ type ApiResponse<T> = {
   success: boolean;
   data: T;
   message?: string | string[];
-  error?: {
-    message?: string | string[];
-  };
+  error?: { message?: string | string[] };
+};
+
+type PatientIdentity = {
+  _id?: string;
+  id?: string;
+  userId?: string | {
+    _id?: string;
+    id?: string;
+  } | null;
 };
 
 async function request<T>(
@@ -69,13 +76,14 @@ async function request<T>(
       },
     });
   } catch (error) {
-    console.error("[Equilibra API] Falha de conexão:", {
+    console.error("Falha de conexão:", {
       endpoint: path,
       error,
     });
 
     throw new Error(
       `Não foi possível conectar ao servidor ao consultar ${path}.`,
+      { cause: error },
     );
   }
 
@@ -85,12 +93,11 @@ async function request<T>(
 
   if (!response.ok || !result?.success) {
     const message = result?.error?.message ?? result?.message;
-
     const details = Array.isArray(message)
       ? message.join(" ")
       : message ?? "Resposta inválida da API.";
 
-    console.error("[Equilibra API] Requisição falhou:", {
+    console.error("Requisição falhou:", {
       endpoint: path,
       status: response.status,
       message: details,
@@ -104,33 +111,19 @@ async function request<T>(
   return result.data;
 }
 
-type PatientIdentity = {
-  _id?: string;
-  id?: string;
-};
-
-export async function getMyPatientExercises(
-  accessToken: string,
-): Promise<PatientExercisesData> {
-  const patients = await request<PatientIdentity[]>(
-    "/patients",
-    accessToken,
-  );
-
-  const patient = patients[0];
-  const patientId = patient?.id ?? patient?._id;
-
-  if (!patientId) {
-    console.error(
-      "[Equilibra API] Nenhum paciente encontrado na resposta de /patients.",
-    );
-
-    throw new Error(
-      "Não foi possível identificar o perfil do paciente.",
-    );
+function getUserId(patient: PatientIdentity): string | undefined {
+  if (typeof patient.userId === "string") {
+    return patient.userId;
   }
 
-  const query = `?patientId=${encodeURIComponent(patientId)}`;
+  return patient.userId?._id ?? patient.userId?.id;
+}
+
+async function loadPatientExercises(
+  accessToken: string,
+  patientId: string,
+): Promise<PatientExercisesData> {
+  const query = `?patientId=${encodeURIComponent(patientId)}&limit=100`;
 
   const [exercises, plans, logs] = await Promise.all([
     request<ExerciseRecord<PatientExerciseData>[]>(
@@ -147,19 +140,51 @@ export async function getMyPatientExercises(
     ),
   ]);
 
-  const result: PatientExercisesData = {
-    patientId,
-    exercises,
-    plans,
-    logs,
-  };
+  return { patientId, exercises, plans, logs };
+}
 
-  console.info("[Equilibra API] Exercícios carregados:", {
+export async function getMyPatientExercises(
+  accessToken: string,
+  userId: string,
+): Promise<PatientExercisesData> {
+  if (!userId) {
+    throw new Error(
+      "Não foi possível identificar a conta autenticada.",
+    );
+  }
+
+  const patients = await request<PatientIdentity[]>(
+    "/patients",
+    accessToken,
+  );
+
+  const patient = patients.find(
+    (item) => getUserId(item) === userId,
+  );
+
+  const patientId = patient?.id ?? patient?._id;
+
+  if (!patientId) {
+    throw new Error(
+      "Não foi encontrado um perfil de paciente vinculado à conta autenticada.",
+    );
+  }
+
+  const result = await loadPatientExercises(accessToken, patientId);
+
+  console.info("Exercícios carregados:", {
     patientId,
-    exercises: exercises.length,
-    plans: plans.length,
-    logs: logs.length,
+    exercises: result.exercises.length,
+    plans: result.plans.length,
+    logs: result.logs.length,
   });
 
   return result;
+}
+
+export async function getPatientExercises(
+  accessToken: string,
+  patientId: string,
+): Promise<PatientExercisesData> {
+  return loadPatientExercises(accessToken, patientId);
 }
