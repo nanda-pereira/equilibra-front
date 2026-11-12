@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import EmptyState from "../../components/app/EmptyState";
 import GlassCard from "../../components/app/GlassCard";
 import ListRow from "../../components/app/ListRow";
@@ -10,10 +10,7 @@ import StretchIllustration from "../../components/app/StretchIllustration";
 import { ExerciseIcon } from "../../components/ui/icons";
 import { DISCLAIMER, STRETCHES, type Stretch } from "../../modules/demo/stretches";
 import { useSession } from "../../modules/session/session";
-import {
-  getMyPatientExercises,
-  type PatientExercisesData,
-} from "../../services/api/exercises";
+import usePatientExercisesData from "../../hooks/usePatientExercisesData";
 
 function formatDuration(minutes?: number) {
   if (!minutes || minutes <= 0) return "Duração não informada";
@@ -96,54 +93,13 @@ function StretchCard({
 export default function ExercisesPage() {
   const { session } = useSession();
 
-  const [data, setData] = useState<PatientExercisesData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error } = usePatientExercisesData(
+    session?.accessToken,
+    session?.profile,
+    session?.userId,
+  );
+
   const [openId, setOpenId] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadExercises() {
-      if (!session?.accessToken || session.profile !== "paciente") {
-        setData(null);
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        const result = await getMyPatientExercises(session.accessToken);
-
-        if (!cancelled) {
-          setData(result);
-          console.info("[Equilibra API] Exercícios carregados:", result);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Não foi possível carregar os exercícios.",
-          );
-          console.error("[Equilibra API] Erro nos exercícios:", err);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadExercises();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [session?.accessToken, session?.profile]);
-
   const exercises =
     data?.exercises.filter(
       (exercise) => exercise.status.toUpperCase() === "ACTIVE",
