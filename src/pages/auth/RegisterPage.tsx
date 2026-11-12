@@ -44,7 +44,7 @@ async function handleCreateAccount() {
 
   try {
     const result = await registerUser(profile, data);
-    setRegistrationResult(result ?? null);
+    setRegistrationResult(result);
 
     // A senha não precisa continuar na memória depois do cadastro.
     setData((prev) => ({
