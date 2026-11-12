@@ -62,16 +62,6 @@ export function buildRegisterPayload(
   };
 }
 
-async function mockRegister(data: RegisterData) {
-  await new Promise((resolve) => setTimeout(resolve, 900));
-
-  if (data.email.trim().toLowerCase() === "erro@teste.com") {
-    throw new ApiError(
-      "Não foi possível criar a conta agora. Tente novamente.",
-    );
-  }
-}
-
 function getErrorMessage(
   message: string | string[] | undefined,
 ): string | undefined {
@@ -82,10 +72,11 @@ function getErrorMessage(
 export async function registerUser(
   profile: ProfileType,
   data: RegisterData,
-): Promise<RegisterResponseData | undefined> {
+): Promise<RegisterResponseData> {
   if (!API_URL) {
-    await mockRegister(data);
-    return;
+    throw new ApiError(
+      "A API não está configurada. Verifique a variável VITE_API_URL.",
+    );
   }
 
   let response: Response;

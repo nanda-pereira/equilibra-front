@@ -1,8 +1,8 @@
+
 import { useNavigate } from "react-router";
 import Button from "../../../components/ui/Button";
 import StepHeading from "../../../components/ui/StepHeading";
 import type { ProfileType } from "../../../modules/auth/types";
-import { useSession } from "../../../modules/session/session";
 import type { RegisterResponseData } from "../../../modules/auth/authApi";
 
 type WelcomeStepProps = {
@@ -11,29 +11,24 @@ type WelcomeStepProps = {
   registrationResult: RegisterResponseData | null;
 };
 
-export default function WelcomeStep({ profile, fullName, registrationResult }: WelcomeStepProps) {
+export default function WelcomeStep({
+  fullName,
+  registrationResult,
+}: WelcomeStepProps) {
   const navigate = useNavigate();
-  const { signIn } = useSession();
   const firstName = fullName.trim().split(/\s+/)[0] ?? "";
 
   function handleStart() {
-    if (registrationResult) {
-      // O cadastro real ainda exige verificação de e-mail.
-      // Não liberar /app antes dessa verificação.
-      navigate("/login", {
-        state: {
-          email: registrationResult.user?.email,
-          requiresEmailVerification: true,
-          verificationToken:
-            registrationResult.emailVerificationDevToken,
-        },
-      });
-      return;
-    }
+    if (!registrationResult) return;
 
-    // Fluxo de demonstração, sem backend.
-    signIn({ profile, name: fullName.trim() });
-    navigate("/app");
+    navigate("/login", {
+      state: {
+        email: registrationResult.user?.email,
+        requiresEmailVerification: true,
+        verificationToken:
+          registrationResult.emailVerificationDevToken,
+      },
+    });
   }
 
   return (

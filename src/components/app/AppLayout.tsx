@@ -6,6 +6,7 @@ import { useSession } from "../../modules/session/session";
 import Icon from "../ui/Icon";
 import { CloseIcon, LogoutIcon, MenuIcon } from "../ui/icons";
 import AssistantWidget from "./AssistantWidget";
+import { logoutBackendSession } from "../../modules/auth/sessionApi";
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   `flex min-h-12 items-center gap-3 rounded-full px-4 text-base transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action ${
@@ -81,10 +82,21 @@ export default function AppLayout() {
 
   const nav = NAV_BY_PROFILE[session.profile];
 
-  function handleSignOut() {
+  async function handleSignOut() {
     setMenuOpen(false);
-    signOut();
-    navigate("/login");
+
+    const refreshToken = session?.refreshToken;
+
+    try {
+      if (refreshToken) {
+        await logoutBackendSession(refreshToken);
+      }
+    } catch (error) {
+      console.error("Não foi possível revogar a sessão no servidor:", error);
+    } finally {
+      signOut();
+      navigate("/login");
+    }
   }
 
   return (
