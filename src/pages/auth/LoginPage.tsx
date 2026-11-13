@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link, Navigate } from "react-router";
+import { Link, Navigate, useLocation } from "react-router";
 import AuthLayout from "../../components/layout/AuthLayout";
 import Button from "../../components/ui/Button";
 import GlassPanel from "../../components/ui/GlassPanel";
@@ -7,29 +7,51 @@ import Icon from "../../components/ui/Icon";
 import Input from "../../components/ui/Input";
 import PasswordInput from "../../components/ui/PasswordInput";
 import { CheckIcon } from "../../components/ui/icons";
-import { ApiError } from "../../modules/auth/authApi";
-import { DEMO_ACCOUNTS, isDemoMode, loginUser } from "../../modules/auth/loginApi";
+import { ApiError, verifyEmail } from "../../modules/auth/authApi";
+import { loginUser } from "../../modules/auth/loginApi";
 import { useSession } from "../../modules/session/session";
+
+type LoginLocationState = {
+  email?: string;
+  requiresEmailVerification?: boolean;
+  verificationToken?: string;
+};
+
 
 export default function LoginPage() {
   const { session, signIn } = useSession();
-  const [identifier, setIdentifier] = useState("");
+  const location = useLocation();
+
+  const verificationState = (location.state ?? null) as
+    | LoginLocationState
+    | null;
+
+  const [identifier, setIdentifier] = useState(
+    () => verificationState?.email ?? "",
+  );
   const [password, setPassword] = useState("");
-  const [keepSignedIn, setKeepSignedIn] = useState(false); // TODO: ainda sem efeito (sem backend)
+  const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [recoveryNotice, setRecoveryNotice] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [verificationDone, setVerificationDone] = useState(false);
 
-  if (session) return <Navigate to="/app" replace />;
+  if (session) {
+    return <Navigate to="/app" replace />;
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitted(true);
     setFormError("");
+
     if (!identifier.trim() || !password) return;
 
     setSubmitting(true);
+
     try {
       signIn(await loginUser(identifier, password));
     } catch (error) {
@@ -40,6 +62,41 @@ export default function LoginPage() {
       );
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleVerifyEmail() {
+    const token = verificationState?.verificationToken;
+
+    if (!token) {
+      setVerificationStatus(
+        "Não há um token de verificação disponível nesta sessão. Confira as instruções de verificação do seu ambiente.",
+      );
+      return;
+    }
+
+    setVerifying(true);
+    setVerificationStatus("");
+
+    try {
+      await verifyEmail(token);
+
+      setVerificationDone(true);
+      setVerificationStatus(
+        "E-mail confirmado com sucesso! Agora você pode entrar com seu e-mail e senha.",
+      );
+
+      if (verificationState.email) {
+        setIdentifier(verificationState.email);
+      }
+    } catch (error) {
+      setVerificationStatus(
+        error instanceof ApiError
+          ? error.message
+          : "Não foi possível confirmar seu e-mail. Tente novamente.",
+      );
+    } finally {
+      setVerifying(false);
     }
   }
 
@@ -54,28 +111,44 @@ export default function LoginPage() {
             >
               Entrar no Equilibra
             </h1>
+
             <p className="mt-3 text-base text-ink-soft md:text-xl">
               Mais segurança para estar em movimento.
             </p>
 
-            {isDemoMode && (
-              <div className="mt-8">
-                <p className="text-sm font-medium text-action-hover">Acessos de demonstração</p>
-                <p className="mt-1 text-sm text-ink-soft">
-                  Dados fictícios. Escolha um perfil para entrar sem digitar nada.
+            {verificationState?.requiresEmailVerification && (
+              <div
+                className="mt-6 rounded-2xl border border-[#D5E7E4] bg-white/70 p-5"
+                aria-live="polite"
+              >
+                <h2 className="text-base font-semibold text-[#282B2D]">
+                  {verificationDone
+                    ? "E-mail confirmado"
+                    : "Confirme seu e-mail"}
+                </h2>
+
+                <p className="mt-2 text-sm leading-relaxed text-[#586463]">
+                  {verificationDone
+                    ? "Sua conta está verificada. Entre com seu e-mail e sua senha para continuar."
+                    : "Sua conta foi criada. Confirme seu e-mail para liberar o acesso à plataforma."}
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2.5">
-                  {DEMO_ACCOUNTS.map((account) => (
-                    <button
-                      key={account.email}
-                      type="button"
-                      onClick={() => signIn({ profile: account.profile, name: account.name })}
-                      className="inline-flex h-11 items-center rounded-full border border-brand px-5 text-sm text-action transition-colors hover:bg-mint-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
-                    >
-                      {account.label}
-                    </button>
-                  ))}
-                </div>
+
+                {!verificationDone && verificationState.verificationToken && (
+                  <button
+                    type="button"
+                    onClick={handleVerifyEmail}
+                    disabled={verifying}
+                    className="mt-4 w-full rounded-full bg-[#247477] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#1B5E60] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {verifying ? "Confirmando…" : "Confirmar e-mail"}
+                  </button>
+                )}
+
+                {verificationStatus && (
+                  <p className="mt-3 text-sm text-[#586463]" role="status">
+                    {verificationStatus}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -87,15 +160,22 @@ export default function LoginPage() {
               autoComplete="username"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              error={submitted && !identifier.trim() ? "Campo obrigatório" : undefined}
+              error={
+                submitted && !identifier.trim()
+                  ? "Campo obrigatório"
+                  : undefined
+              }
             />
+
             <PasswordInput
               label="Senha"
               placeholder="••••••••"
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              error={submitted && !password ? "Campo obrigatório" : undefined}
+              error={
+                submitted && !password ? "Campo obrigatório" : undefined
+              }
             />
 
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -124,8 +204,11 @@ export default function LoginPage() {
             </div>
 
             <p aria-live="polite" className="mt-2 min-h-5 text-sm text-ink-soft">
-              {recoveryNotice ? "A recuperação de acesso ainda está em construção." : ""}
+              {recoveryNotice
+                ? "A recuperação de acesso ainda está em construção."
+                : ""}
             </p>
+
             <p role="alert" className="min-h-5 text-sm text-alert-text">
               {formError}
             </p>

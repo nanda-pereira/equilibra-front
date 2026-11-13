@@ -1,7 +1,12 @@
+
 import { useState } from "react";
 import AuthLayout from "../../components/layout/AuthLayout";
 import Stepper from "../../components/ui/Stepper";
-import { ApiError, registerUser } from "../../modules/auth/authApi";
+import {
+  ApiError,
+  registerUser,
+} from "../../modules/auth/authApi";
+import type { RegisterResponseData } from "../../modules/auth/authApi";
 import {
   EMPTY_REGISTER_DATA,
   type ProfileType,
@@ -20,6 +25,8 @@ export default function RegisterPage() {
   const [data, setData] = useState<RegisterData>(EMPTY_REGISTER_DATA);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [registrationResult, setRegistrationResult] =
+    useState<RegisterResponseData | null>(null);
 
   function updateField<K extends keyof RegisterData>(
     field: K,
@@ -28,27 +35,35 @@ export default function RegisterPage() {
     setData((prev) => ({ ...prev, [field]: value }));
   }
 
-  async function handleCreateAccount() {
-    if (!profile || submitting) return;
+  
+async function handleCreateAccount() {
+  if (!profile || submitting) return;
 
-    setSubmitting(true);
-    setSubmitError("");
+  setSubmitting(true);
+  setSubmitError("");
 
-    try {
-      await registerUser(profile, data);
-      // a senha não precisa continuar na memória depois do cadastro
-      setData((prev) => ({ ...prev, password: "", confirmPassword: "" }));
-      setStep(3);
-    } catch (error) {
-      setSubmitError(
-        error instanceof ApiError
-          ? error.message
-          : "Não foi possível criar a conta agora. Tente novamente.",
-      );
-    } finally {
-      setSubmitting(false);
-    }
+  try {
+    const result = await registerUser(profile, data);
+    setRegistrationResult(result);
+
+    // A senha não precisa continuar na memória depois do cadastro.
+    setData((prev) => ({
+      ...prev,
+      password: "",
+      confirmPassword: "",
+    }));
+
+    setStep(3);
+  } catch (error) {
+    setSubmitError(
+      error instanceof ApiError
+        ? error.message
+        : "Não foi possível criar a conta agora. Tente novamente.",
+    );
+  } finally {
+    setSubmitting(false);
   }
+}
 
   return (
     // background: "figma" (reprodução do print) ou "design-system" (o meu)
@@ -94,7 +109,11 @@ export default function RegisterPage() {
         )}
 
         {step === 3 && profile && (
-          <WelcomeStep profile={profile} fullName={data.fullName} />
+          <WelcomeStep
+            profile={profile}
+            fullName={data.fullName}
+            registrationResult={registrationResult}
+          />
         )}
       </div>
     </AuthLayout>

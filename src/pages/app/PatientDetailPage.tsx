@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router";
 import EmptyState from "../../components/app/EmptyState";
 import GlassCard from "../../components/app/GlassCard";
@@ -7,265 +7,407 @@ import ListRow from "../../components/app/ListRow";
 import MedicationsPanel from "../../components/app/MedicationsPanel";
 import PageHeader from "../../components/app/PageHeader";
 import SmallButton from "../../components/app/SmallButton";
-import Icon from "../../components/ui/Icon";
-import Input from "../../components/ui/Input";
-import Select from "../../components/ui/Select";
-import Textarea from "../../components/ui/Textarea";
-import { CalendarIcon, ChevronLeftIcon, MessageIcon } from "../../components/ui/icons";
-import { formatPhone, isValidEmail, onlyDigits } from "../../modules/auth/validation";
+import { CalendarIcon, MessageIcon } from "../../components/ui/icons";
 import {
-  getAgendaFor,
-  getPatientRecord,
-  getPatientSummaries,
-  recordsAll,
-  updatePatientRecord,
-  useAppState,
-} from "../../modules/demo/appStore";
-import { shortDay } from "../../modules/demo/demoData";
-import { STAGES, type PatientEditable } from "../../modules/demo/patientStore";
+  getAccessiblePatients,
+  getPatientAppointments,
+  getPatientObservations,
+  type ObservationData,
+  type PatientAppointment,
+  type PatientProfile,
+  type PatientRecord,
+} from "../../services/api/patients";
 import { useSession } from "../../modules/session/session";
 
-type DraftErrors = Partial<Record<keyof PatientEditable, string>>;
+type PatientItem = {
+  id: string;
+  name: string;
+  email: string;
+  birthDate?: string;
+  phone?: string;
+  diagnosis?: string;
+  diagnosisDate?: string;
+  stage?: string;
+  caregiver?: string;
+  notes?: string;
+};
 
-function validateDraft(draft: PatientEditable): DraftErrors {
-  const errors: DraftErrors = {};
-  if (!draft.email.trim()) errors.email = "Campo obrigatório";
-  else if (!isValidEmail(draft.email)) errors.email = "E-mail inválido";
-  const digits = onlyDigits(draft.phone);
-  if (!digits) errors.phone = "Campo obrigatório";
-  else if (digits.length < 10) errors.phone = "Telefone inválido";
-  if (!draft.diagnosis.trim()) errors.diagnosis = "Campo obrigatório";
-  if (!draft.stage) errors.stage = "Selecione uma opção";
-  return errors;
+type ObservationItem = {
+  id: string;
+  category: string;
+  notes: string;
+  createdAt?: string;
+};
+
+const DATE_FORMAT = new Intl.DateTimeFormat("pt-BR", {
+  day: "2-digit",
+  month: "long",
+  year: "numeric",
+});
+
+const DATE_TIME_FORMAT = new Intl.DateTimeFormat("pt-BR", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+function getPatientId(patient: PatientProfile) {
+  return patient.id ?? patient._id ?? "";
+}
+
+function toPatientItem(patient: PatientProfile): PatientItem | null {
+  const id = getPatientId(patient);
+  if (!id) return null;
+
+  const user = patient.userId;
+  const userData =
+    typeof user === "object" && user !== null ? user : undefined;
+
+  const profile = patient as PatientProfile & {
+    birthDate?: string;
+    phone?: string;
+    diagnosis?: string;
+    stage?: string;
+    caregiver?: string;
+  };
+
+  return {
+    id,
+    name: userData?.fullName || userData?.email || "Paciente",
+    email: userData?.email || "",
+    birthDate: profile.birthDate,
+    phone: profile.phone,
+    diagnosis: profile.diagnosis,
+    diagnosisDate: patient.clinicalProfile?.diagnosisDate,
+    stage: profile.stage,
+    caregiver: profile.caregiver,
+    notes: patient.clinicalProfile?.followUpNotes,
+  };
+}
+
+function toObservationItem(
+  record: PatientRecord<ObservationData>,
+): ObservationItem {
+  return {
+    id: record._id,
+    category: record.data?.category || "Observação",
+    notes: record.data?.notes || "",
+    createdAt: record.createdAt ?? record.updatedAt,
+  };
+}
+
+function formatDate(value?: string) {
+  if (!value) return "Não informado";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Não informado";
+
+  return DATE_FORMAT.format(date);
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return "Data não informada";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Data não informada";
+
+  return DATE_TIME_FORMAT.format(date);
 }
 
 export default function PatientDetailPage() {
   const { session } = useSession();
   const { patientId = "" } = useParams();
-  useAppState();
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<PatientEditable>({ email: "", phone: "", diagnosis: "", stage: "", notes: "" });
-  const [submitted, setSubmitted] = useState(false);
-  const [saved, setSaved] = useState(false);
 
-  const record = getPatientRecord(patientId);
-  const summary = getPatientSummaries().find((item) => item.id === patientId);
+  const [patient, setPatient] = useState<PatientItem | null>(null);
+  const [appointments, setAppointments] = useState<PatientAppointment[]>([]);
+  const [observations, setObservations] = useState<ObservationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [error, setError] = useState("");
+
+  const accessToken = session?.accessToken;
+  const profile = session?.profile;
+  const canEdit = profile === "medico";
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPatientDetails() {
+      if (
+        !accessToken ||
+        (profile !== "medico" && profile !== "cuidador-clinico") ||
+        !patientId
+      ) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+
+      try {
+        const profiles = await getAccessiblePatients(accessToken);
+        const selected = profiles.find(
+          (item) => getPatientId(item) === patientId,
+        );
+
+        if (!selected) {
+          if (!cancelled) {
+            setPatient(null);
+            setAppointments([]);
+            setObservations([]);
+          }
+          return;
+        }
+
+        const patientItem = toPatientItem(selected);
+
+        const [appointmentResults, observationResults] =
+          await Promise.all([
+            getPatientAppointments(accessToken, patientId),
+            getPatientObservations(accessToken, patientId),
+          ]);
+
+        if (cancelled) return;
+
+        setCurrentTime(Date.now());
+        setPatient(patientItem);
+        setAppointments(
+          [...appointmentResults].sort((a, b) => {
+            const dateA = a.data?.scheduledAt
+              ? new Date(a.data.scheduledAt).getTime()
+              : 0;
+            const dateB = b.data?.scheduledAt
+              ? new Date(b.data.scheduledAt).getTime()
+              : 0;
+            return dateA - dateB;
+          }),
+        );
+        setObservations(
+          observationResults
+            .map(toObservationItem)
+            .sort((a, b) => {
+              const dateA = a.createdAt
+                ? new Date(a.createdAt).getTime()
+                : 0;
+              const dateB = b.createdAt
+                ? new Date(b.createdAt).getTime()
+                : 0;
+              return dateB - dateA;
+            })
+            .slice(0, 5),
+        );
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Não foi possível carregar os dados do paciente.",
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void loadPatientDetails();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, profile, patientId]);
 
   if (!session) return null;
-  if (session.profile !== "medico" && session.profile !== "cuidador-clinico") {
+
+  if (
+    session.profile !== "medico" &&
+    session.profile !== "cuidador-clinico"
+  ) {
     return <Navigate to="/app/inicio" replace />;
   }
 
-  if (!record || !summary) {
+  if (loading) {
     return (
       <div className="flex flex-col gap-6">
-        <PageHeader title="Paciente" demo />
+        <PageHeader title="Paciente" subtitle="Carregando cadastro" />
         <GlassCard>
-          <EmptyState title="Paciente não encontrado" description="Ele pode não estar vinculado a você." />
+          <p className="text-sm text-ink-soft">
+            Carregando dados do paciente...
+          </p>
+        </GlassCard>
+      </div>
+    );
+  }
+
+  if (!patient) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title="Paciente" />
+        {error && (
+          <p
+            role="alert"
+            className="rounded-[20px] bg-alert-bg px-4 py-3 text-sm text-alert-text"
+          >
+            {error}
+          </p>
+        )}
+        <GlassCard>
+          <EmptyState
+            title={error ? "Não foi possível carregar o paciente" : "Paciente não encontrado"}
+            description={
+              error
+                ? "Verifique a conexão e tente novamente."
+                : "Ele pode não estar vinculado à sua conta."
+            }
+          />
           <div className="mt-4 flex justify-center">
-            <SmallButton to="/app/pacientes">Voltar para pacientes</SmallButton>
+            <SmallButton to="/app/pacientes">
+              Voltar para pacientes
+            </SmallButton>
           </div>
         </GlassCard>
       </div>
     );
   }
 
-  const canEdit = session.profile === "medico";
-  const errors = validateDraft(draft);
-  const shown = (key: keyof PatientEditable) => (submitted ? errors[key] : undefined);
+  const upcoming = appointments.filter((item) => {
+    const value = item.data?.scheduledAt;
+    if (!value || currentTime === 0) return false;
 
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const upcoming = getAgendaFor("medico")
-    .filter((item) => item.patientId === patientId && item.date >= startOfToday)
-    .sort((a, b) => a.date.getTime() - b.date.getTime() || a.time.localeCompare(b.time));
-  const records = recordsAll().filter((item) => item.patientId === patientId).slice(0, 5);
+    const date = new Date(value);
+    return (
+      !Number.isNaN(date.getTime()) &&
+      date.getTime() >= currentTime
+    );
+  });
 
-  const startEditing = () => {
-    setDraft({
-      email: record.email,
-      phone: record.phone,
-      diagnosis: record.diagnosis,
-      stage: record.stage,
-      notes: record.notes,
-    });
-    setSubmitted(false);
-    setSaved(false);
-    setEditing(true);
-  };
-
-  const handleSave = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setSubmitted(true);
-    if (Object.keys(errors).length > 0) return;
-    updatePatientRecord(patientId, {
-      ...draft,
-      email: draft.email.trim(),
-      diagnosis: draft.diagnosis.trim(),
-      notes: draft.notes.trim(),
-    });
-    setEditing(false);
-    setSaved(true);
-  };
+  const observationItems = observations.filter((item) => item.notes.trim());
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <SmallButton to="/app/pacientes">
           <span className="inline-flex items-center gap-1.5">
-            <Icon icon={ChevronLeftIcon} size={18} />
+            <span aria-hidden="true">←</span>
             Pacientes
           </span>
         </SmallButton>
       </div>
 
-      <PageHeader title={record.name} subtitle={`${summary.age} anos · ${record.diagnosis}`} demo>
-        <SmallButton variant="solid" to={`/app/mensagens?paciente=${patientId}`} label={`Contatar ${record.name}`}>
+      <PageHeader
+        title={patient.name}
+        subtitle="Dados cadastrais e acompanhamento clínico"
+      >
+        <SmallButton
+          variant="solid"
+          to={`/app/mensagens?paciente=${patientId}`}
+          label={`Contatar ${patient.name}`}
+        >
           Contatar
         </SmallButton>
-        {canEdit && !editing && <SmallButton onClick={startEditing}>Editar dados</SmallButton>}
       </PageHeader>
 
-      {saved && !editing && (
-        <p role="status" className="rounded-[20px] bg-success-bg px-4 py-3 text-sm text-success-text">
-          Dados atualizados. Como é uma demonstração, as alterações não são enviadas a um servidor.
+      {error && (
+        <p
+          role="alert"
+          className="rounded-[20px] bg-alert-bg px-4 py-3 text-sm text-alert-text"
+        >
+          {error}
         </p>
       )}
 
-      {editing ? (
-        <GlassCard title="Editar dados do paciente">
-          <form noValidate onSubmit={handleSave}>
-            <p className="mb-5 text-sm text-ink-soft">
-              O nome e a data de nascimento vêm do cadastro do paciente e não são editados aqui.
-            </p>
-            <div className="grid gap-x-6 sm:grid-cols-2">
-              <Input
-                label="E-mail"
-                type="email"
-                autoComplete="off"
-                value={draft.email}
-                onChange={(e) => setDraft({ ...draft, email: e.target.value })}
-                error={shown("email")}
-              />
-              <Input
-                label="Telefone"
-                inputMode="numeric"
-                autoComplete="off"
-                maxLength={15}
-                value={draft.phone}
-                onChange={(e) => setDraft({ ...draft, phone: formatPhone(e.target.value) })}
-                error={shown("phone")}
-              />
-              <Input
-                label="Diagnóstico"
-                autoComplete="off"
-                value={draft.diagnosis}
-                onChange={(e) => setDraft({ ...draft, diagnosis: e.target.value })}
-                error={shown("diagnosis")}
-              />
-              <Select
-                label="Estágio"
-                options={STAGES}
-                value={draft.stage}
-                onChange={(e) => setDraft({ ...draft, stage: e.target.value })}
-                error={shown("stage")}
-              />
-            </div>
-            <Textarea
-              label="Observações"
-              placeholder="Registre informações úteis para o acompanhamento"
-              value={draft.notes}
-              onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-            />
-            <div className="mt-2 flex flex-wrap gap-3">
-              <SmallButton type="submit" variant="solid">
-                Salvar alterações
-              </SmallButton>
-              <SmallButton onClick={() => setEditing(false)}>Cancelar</SmallButton>
-            </div>
-          </form>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <GlassCard title="Dados pessoais">
+          <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+            <Info label="Nome completo">{patient.name}</Info>
+            <Info label="Data de nascimento">
+              {formatDate(patient.birthDate)}
+            </Info>
+            <Info label="E-mail">
+              {patient.email || "Não informado"}
+            </Info>
+            <Info label="Telefone">
+              {patient.phone || "Não informado"}
+            </Info>
+          </dl>
         </GlassCard>
-      ) : (
-        <>
-          <div className="grid gap-6 xl:grid-cols-2">
-            <GlassCard title="Dados pessoais">
-              <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-                <Info label="Nome completo">{record.name}</Info>
-                <Info label="Data de nascimento">
-                  {record.birthDate} ({summary.age} anos)
-                </Info>
-                <Info label="E-mail">{record.email}</Info>
-                <Info label="Telefone">{record.phone}</Info>
-              </dl>
-            </GlassCard>
 
-            <GlassCard title="Acompanhamento">
-              <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-                <Info label="Diagnóstico">{record.diagnosis}</Info>
-                <Info label="Estágio">{record.stage}</Info>
-                <Info label="Cuidador vinculado">{record.caregiver}</Info>
-                <Info label="Medicamentos na semana">
-                  {summary.medsWeek.taken} de {summary.medsWeek.total} registrados
-                </Info>
-              </dl>
-            </GlassCard>
-          </div>
+        <GlassCard title="Acompanhamento">
+          <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+            <Info label="Diagnóstico">
+              {patient.diagnosis || "Não informado"}
+            </Info>
+            <Info label="Data do diagnóstico">
+              {formatDate(patient.diagnosisDate)}
+            </Info>
+            <Info label="Estágio">
+              {patient.stage || "Não informado"}
+            </Info>
+            <Info label="Cuidador vinculado">
+              {patient.caregiver || "Não informado"}
+            </Info>
+          </dl>
+        </GlassCard>
+      </div>
 
-          <div className="grid gap-6 xl:grid-cols-2">
-            <GlassCard title="Observações">
-              {record.notes ? (
-                <p className="text-base text-ink">{record.notes}</p>
-              ) : (
-                <EmptyState
-                  title="Nenhuma observação registrada"
-                  description={canEdit ? "Use “Editar dados” para registrar uma observação." : undefined}
+      <div className="grid gap-6 xl:grid-cols-2">
+        <GlassCard title="Observações clínicas">
+          {patient.notes?.trim() ? (
+            <p className="whitespace-pre-wrap text-base text-ink">
+              {patient.notes}
+            </p>
+          ) : (
+            <EmptyState title="Nenhuma observação cadastral registrada" />
+          )}
+        </GlassCard>
+
+        <GlassCard title="Próximas consultas">
+          {upcoming.length === 0 ? (
+            <EmptyState title="Nenhuma consulta prevista" />
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {upcoming.slice(0, 4).map((item) => (
+                <ListRow
+                  key={item._id}
+                  icon={CalendarIcon}
+                  title={item.data?.title || "Consulta"}
+                  subtitle={`${formatDateTime(item.data?.scheduledAt)}${
+                    item.data?.location
+                      ? ` · ${item.data.location}`
+                      : ""
+                  }`}
                 />
-              )}
-            </GlassCard>
+              ))}
+            </ul>
+          )}
+        </GlassCard>
+      </div>
 
-            <GlassCard title="Próximas consultas">
-              {upcoming.length === 0 ? (
-                <EmptyState title="Nenhuma consulta prevista" />
-              ) : (
-                <ul className="flex flex-col gap-3">
-                  {upcoming.slice(0, 4).map((item) => (
-                    <ListRow
-                      key={item.id}
-                      icon={CalendarIcon}
-                      title={shortDay(item.date)}
-                      subtitle={`${item.time} · ${item.detail}`}
-                    />
-                  ))}
-                </ul>
-              )}
-            </GlassCard>
-          </div>
+      <GlassCard title="Registros de evolução">
+        {observationItems.length === 0 ? (
+          <EmptyState title="Nenhum registro de evolução encontrado" />
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {observationItems.map((item) => (
+              <ListRow
+                key={item.id}
+                icon={MessageIcon}
+                title={item.category}
+                subtitle={`${formatDateTime(item.createdAt)} · ${item.notes}`}
+              />
+            ))}
+          </ul>
+        )}
+      </GlassCard>
 
-          <GlassCard title="Registros de evolução">
-            {records.length === 0 ? (
-              <EmptyState title="Nenhum registro ainda" />
-            ) : (
-              <ul className="flex flex-col gap-3">
-                {records.map((item) => (
-                  <ListRow
-                    key={item.id}
-                    icon={MessageIcon}
-                    title={item.text}
-                    subtitle={`${item.author} · ${item.when}`}
-                  />
-                ))}
-              </ul>
-            )}
-          </GlassCard>
-
-          <MedicationsPanel
-            patientId={patientId}
-            canConfirm={false}
-            prescribe={canEdit}
-            authorName={session.name}
-          />
-        </>
-      )}
+      <MedicationsPanel
+        patientId={patientId}
+        canConfirm={false}
+        prescribe={canEdit}
+        authorName={session.name}
+      />
     </div>
   );
 }

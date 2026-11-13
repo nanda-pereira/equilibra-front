@@ -1,7 +1,23 @@
 import { useState } from "react";
-import { isSameDay, type AgendaItem } from "../../modules/demo/demoData";
 import Icon from "../ui/Icon";
 import { ChevronLeftIcon, ChevronRightIcon } from "../ui/icons";
+
+type AgendaItem = {
+  id: string;
+  date: Date;
+  time: string;
+  kind: "consulta" | "exercicio";
+  title: string;
+  detail: string;
+};
+
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const FULL_FORMAT = new Intl.DateTimeFormat("pt-BR", {

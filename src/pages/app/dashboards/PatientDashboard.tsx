@@ -1,168 +1,336 @@
-// import AssistantCard from "../../../components/app/AssistantCard";
-import Avatar from "../../../components/app/Avatar";
+
+import { useEffect, useState } from "react";
 import EmptyState from "../../../components/app/EmptyState";
 import GlassCard from "../../../components/app/GlassCard";
-import ListRow from "../../../components/app/ListRow";
-import MetricCard from "../../../components/app/MetricCard";
-import PageHeader from "../../../components/app/PageHeader";
-import ProgressRing from "../../../components/app/ProgressRing";
 import SmallButton from "../../../components/app/SmallButton";
-import { BarTrendChart } from "../../../components/app/charts";
+import { useSession } from "../../../modules/session/session";
 import {
-  CalendarIcon,
-  CheckCircleIcon,
-  ExerciseIcon,
-  MedicineIcon,
-  MessageIcon,
-} from "../../../components/ui/icons";
-import {
-  adherenceWeek,
-  confirmDose,
-  dosesToday,
-  nextConsultation,
-  recordsAll,
-  useAppState,
-} from "../../../modules/demo/appStore";
-import { careNetwork, exerciseWeek, longDayLabel, shortDay } from "../../../modules/demo/demoData";
+  getMyPatientProfileId,
+  getPatientObservations,
+  type ObservationData,
+  type PatientRecord,
+} from "../../../services/api/patients";
+import usePatientDashboardData from "../../../hooks/usePatientDashboardData";
+import usePatientDashboardExercises from "../../../hooks/usePatientDashboardExercises";
+import usePatientDashboardAppointments from "../../../hooks/usePatientDashboardAppointments";
+import usePatientDashboardMedicationSummary from "../../../hooks/usePatientDashboardMedicationSummary";
+import PatientDashboardCareNetwork from "./patient-dashboard/PatientDashboardCareNetwork";
+import PatientDashboardChart from "./patient-dashboard/PatientDashboardChart";
+import PatientDashboardMetrics from "./patient-dashboard/PatientDashboardMetrics";
+import PatientDashboardMedications from "./patient-dashboard/PatientDashboardMedications";
+import PatientDashboardToday from "./patient-dashboard/PatientDashboardToday";
+
+function formatDuration(minutes?: number | null): string {
+  if (minutes == null || !Number.isFinite(minutes)) {
+    return "Duração não informada";
+  }
+
+  return `${minutes} min`;
+}
+
+function formatObservationDate(value?: string | null): string {
+  if (!value) return "Data não informada";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Data não informada";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function getObservationDate(
+  observation: PatientRecord<ObservationData>,
+): string | undefined {
+  const data = observation.data as ObservationData & {
+    observedAt?: string;
+  };
+
+  return data.observedAt ?? observation.createdAt ?? observation.updatedAt;
+}
 
 export default function PatientDashboard() {
-  useAppState();
-  const doses = dosesToday("maria");
-  const taken = doses.filter((dose) => dose.taken).length;
-  const nextDose = doses.find((dose) => !dose.taken);
-  const next = nextConsultation("maria");
-  const week = exerciseWeek();
-  const exercise = week.days.find((day) => day.offset === 0)?.exercise;
-  const notes = recordsAll().filter((item) => item.patientId === "maria").slice(0, 3);
-  const chart = adherenceWeek("maria");
+  const { session } = useSession();
+
+  const {
+    patientMedications,
+    medicationsLoading,
+    medicationsError,
+    patientAppointments,
+    appointmentsLoading,
+    appointmentsError,
+  } = usePatientDashboardData({
+    accessToken: session?.accessToken,
+    profile: session?.profile,
+    userId: session?.userId,
+  });
+
+  const {
+    exercises,
+    todayExerciseLogs,
+    weekExerciseLogs,
+    completedWeekExercises,
+    todayExercise,
+    todayExerciseDetails,
+    activePlans,
+    exercisesLoading,
+    exercisesError,
+  } = usePatientDashboardExercises(
+    session?.accessToken,
+    session?.profile,
+    session?.userId,
+  );
+
+  const {
+    next,
+    nextAppointmentDate,
+    nextAppointmentTime,
+    nextAppointmentTitle,
+    showTodayAppointment,
+  } = usePatientDashboardAppointments({
+    patientAppointments,
+  });
+
+  const {
+    medications,
+    prescriptions,
+    medicationLogs,
+    activePrescriptions,
+    todayMedicationLogs,
+    completedToday,
+  } = usePatientDashboardMedicationSummary({
+    patientMedications,
+  });
+
+  const [recentObservations, setRecentObservations] = useState<
+    PatientRecord<ObservationData>[]
+  >([]);
+  const [observationsLoading, setObservationsLoading] = useState(true);
+  const [observationsError, setObservationsError] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadObservations() {
+      const accessToken = session?.accessToken;
+
+      if (
+        !accessToken ||
+        session?.profile !== "paciente" ||
+        !session?.userId
+      ) {
+        setRecentObservations([]);
+        setObservationsError(null);
+        setObservationsLoading(false);
+        return;
+      }
+
+      setObservationsLoading(true);
+      setObservationsError(null);
+
+      try {
+        const patientId = await getMyPatientProfileId(
+          accessToken,
+          session.userId,
+        );
+        const observations = await getPatientObservations(
+          accessToken,
+          patientId,
+        );
+
+        if (cancelled) return;
+
+        const sortedObservations = [...observations].sort((a, b) => {
+          const dateA = new Date(getObservationDate(a) ?? "").getTime();
+          const dateB = new Date(getObservationDate(b) ?? "").getTime();
+
+          return (
+            (Number.isNaN(dateB) ? 0 : dateB) -
+            (Number.isNaN(dateA) ? 0 : dateA)
+          );
+        });
+
+        setRecentObservations(sortedObservations);
+      } catch (error) {
+        if (cancelled) return;
+
+        setRecentObservations([]);
+        setObservationsError(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível carregar os registros recentes.",
+        );
+      } finally {
+        if (!cancelled) {
+          setObservationsLoading(false);
+        }
+      }
+    }
+
+    void loadObservations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.accessToken, session?.profile, session?.userId]);
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader demo />
-      {/* <AssistantCard /> */}
-
       <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
-        <GlassCard title="Medicamentos de hoje">
-          {doses.length === 0 ? (
-            <EmptyState title="Nenhum medicamento hoje" />
-          ) : (
-            <div className="flex flex-col items-center gap-3 text-center">
-              <ProgressRing value={taken} max={doses.length} label="Medicamentos registrados hoje" />
-              <p className="text-sm text-ink-soft">
-                {nextDose
-                  ? `Próximo: ${nextDose.name} às ${nextDose.time}`
-                  : "Todos os horários de hoje foram registrados."}
-              </p>
-            </div>
-          )}
-        </GlassCard>
+        <PatientDashboardMedications
+          loading={medicationsLoading}
+          error={medicationsError}
+          activePrescriptions={activePrescriptions}
+          medications={medications}
+        />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
-          <MetricCard
-            icon={CalendarIcon}
-            label="Próxima consulta"
-            value={next ? shortDay(next.date) : "—"}
-            note={next ? `às ${next.time} · Dra. Marina` : "Nenhuma agendada"}
-          />
-          <MetricCard
-            icon={ExerciseIcon}
-            label="Exercício de hoje"
-            value={exercise ? exercise.duration : "—"}
-            note={exercise ? exercise.title : "Sem exercício hoje"}
-          />
-          <MetricCard
-            icon={CheckCircleIcon}
-            label="Exercícios da semana"
-            value={`${week.doneBase} de ${week.total}`}
-            note="concluídos"
-          />
-          <MetricCard icon={MessageIcon} label="Registros recentes" value={String(notes.length)} note="da sua equipe" />
-        </div>
+        <PatientDashboardMetrics
+          nextAppointment={{
+            value: appointmentsLoading
+              ? "..."
+              : nextAppointmentDate
+                ? new Intl.DateTimeFormat("pt-BR", {
+                    day: "2-digit",
+                    month: "short",
+                  }).format(nextAppointmentDate)
+                : "—",
+            note: appointmentsLoading
+              ? "Carregando agenda..."
+              : appointmentsError
+                ? "Não foi possível carregar a agenda"
+                : next
+                  ? `${nextAppointmentTime} · ${nextAppointmentTitle}`
+                  : "Nenhuma consulta futura",
+          }}
+          todayExerciseMetric={{
+            value: exercisesLoading
+              ? "..."
+              : todayExercise
+                ? formatDuration(
+                    todayExercise.data.durationMinutes ??
+                      todayExerciseDetails?.data.durationMinutes,
+                  )
+                : "—",
+            note: exercisesLoading
+              ? "Carregando exercícios..."
+              : exercisesError
+                ? "Não foi possível carregar os exercícios"
+                : todayExercise
+                  ? todayExerciseDetails?.data.name ??
+                    "Exercício registrado"
+                  : "Nenhum registro de exercício hoje",
+          }}
+          weekExercises={{
+            value: exercisesLoading
+              ? "..."
+              : `${completedWeekExercises} de ${weekExerciseLogs.length}`,
+            note: exercisesLoading
+              ? "Carregando registros..."
+              : `${activePlans.length} ${
+                  activePlans.length === 1
+                    ? "plano ativo"
+                    : "planos ativos"
+                } · últimos 7 dias`,
+          }}
+          recentRecords={{
+            value: observationsLoading
+              ? "..."
+              : String(recentObservations.length),
+            note: observationsLoading
+              ? "Carregando registros..."
+              : observationsError
+                ? "Não foi possível carregar os registros"
+                : recentObservations.length === 1
+                  ? "observação registrada"
+                  : "observações registradas",
+          }}
+        />
       </div>
 
-      <GlassCard title="Hoje">
-        <ul className="flex flex-col gap-3">
-          {nextDose && (
-            <ListRow
-              icon={MedicineIcon}
-              title={`${nextDose.name} — ${nextDose.time}`}
-              subtitle={nextDose.dose}
-              trailing={
-                <SmallButton
-                  variant="solid"
-                  onClick={() => confirmDose(nextDose.medId, nextDose.time)}
-                  label={`Confirmar ${nextDose.name} das ${nextDose.time}`}
-                >
-                  Confirmar
-                </SmallButton>
-              }
-            />
-          )}
-          {exercise && (
-            <ListRow
-              icon={ExerciseIcon}
-              title={exercise.title}
-              subtitle={`${exercise.duration} · recomendado pela Dra. Marina`}
-              trailing={<SmallButton to="/app/exercicios">Ver exercícios</SmallButton>}
-            />
-          )}
-          {next && (
-            <ListRow
-              icon={CalendarIcon}
-              title="Consulta com Dra. Marina"
-              subtitle={longDayLabel(next.date, next.time)}
-              trailing={<SmallButton to="/app/agenda">Ver detalhes</SmallButton>}
-            />
-          )}
-          {!nextDose && !exercise && !next && <EmptyState title="Nada previsto para hoje" />}
-        </ul>
-      </GlassCard>
+      <PatientDashboardToday
+        medicationsLoading={medicationsLoading}
+        medicationsError={medicationsError}
+        exercisesLoading={exercisesLoading}
+        exercisesError={exercisesError}
+        appointmentsLoading={appointmentsLoading}
+        appointmentsError={appointmentsError}
+        medications={medications}
+        prescriptions={prescriptions}
+        todayMedicationLogs={todayMedicationLogs}
+        todayExerciseLogs={todayExerciseLogs}
+        exercises={exercises}
+        showTodayAppointment={showTodayAppointment}
+        appointmentId={next?._id}
+        appointmentTitle={nextAppointmentTitle}
+        appointmentDate={nextAppointmentDate}
+        appointmentTime={nextAppointmentTime}
+        completedToday={completedToday}
+      />
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <GlassCard title="Medicamentos na semana" description="Horários registrados por dia">
-          <BarTrendChart
-            data={chart}
-            xKey="day"
-            yKey="medications"
-            seriesName="Registrados"
-            summary={`Medicamentos registrados nos últimos 7 dias: ${chart
-              .map((item) => `${item.day}, ${item.medications}`)
-              .join("; ")}.`}
-          />
-        </GlassCard>
+        <PatientDashboardChart medicationLogs={medicationLogs} />
 
         <GlassCard title="Sua rede de cuidado">
-          <ul className="flex flex-col gap-3">
-            {careNetwork.map((person) => (
-              <li key={person.id} className="flex items-center gap-4 rounded-[20px] bg-mint-100/70 px-4 py-3">
-                <Avatar name={person.name} tone="soft" className="bg-white!" />
-                <div>
-                  <p className="text-base font-medium text-ink">{person.name}</p>
-                  <p className="text-sm text-ink-soft">{person.role}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <PatientDashboardCareNetwork
+            accessToken={session?.accessToken}
+            userId={session?.userId}
+          />
         </GlassCard>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <GlassCard title="Registros recentes">
-          {notes.length === 0 ? (
+          {observationsLoading ? (
+            <p className="text-sm text-ink-soft">
+              Carregando registros...
+            </p>
+          ) : observationsError ? (
+            <p className="text-sm text-ink-soft">
+              {observationsError}
+            </p>
+          ) : recentObservations.length === 0 ? (
             <EmptyState title="Nenhum registro ainda" />
           ) : (
-            <ul className="flex flex-col gap-3">
-              {notes.map((note) => (
-                <ListRow key={note.id} icon={MessageIcon} title={note.text} subtitle={`${note.author} · ${note.when}`} />
+            <div className="flex flex-col gap-4">
+              {recentObservations.slice(0, 3).map((observation) => (
+                <article
+                  key={observation._id}
+                  className="rounded-2xl border border-line/60 p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <h3 className="font-medium text-ink">
+                      {observation.data.category || "Observação clínica"}
+                    </h3>
+                    <span className="text-xs text-ink-soft">
+                      {formatObservationDate(getObservationDate(observation))}
+                    </span>
+                  </div>
+
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-ink-soft">
+                    {observation.data.notes || "Sem descrição adicional."}
+                  </p>
+                </article>
               ))}
-            </ul>
+            </div>
           )}
         </GlassCard>
 
         <GlassCard title="Plano de tratamento">
-          <p className="text-base text-ink-soft">Consulte as orientações registradas pela sua equipe de saúde.</p>
+          <p className="text-base text-ink-soft">
+            Consulte as orientações registradas pela sua equipe de saúde.
+          </p>
+
           <div className="mt-4">
-            <SmallButton to="/app/plano-de-tratamento">Ver plano</SmallButton>
+            <SmallButton to="/app/plano-de-tratamento">
+              Ver plano
+            </SmallButton>
           </div>
         </GlassCard>
       </div>
