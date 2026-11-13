@@ -32,7 +32,7 @@ const bottom = [myProfile, settings];
 export const NAV_BY_PROFILE: Record<ProfileType, NavConfig> = {
   paciente: { main: [home, monitoring, medications, exercises, agenda, messages], bottom },
   medico: { main: [home, patients, agenda, evolution, reports, messages], bottom },
-  "cuidador-clinico": { main: [home, patients, monitoring, medications, agenda, reports], bottom },
+  "cuidador-clinico": { main: [home, patients, monitoring, medications, agenda, messages, reports], bottom },
   "cuidador-domiciliar": { main: [home, medications, exercises, agenda], bottom },
 };
 

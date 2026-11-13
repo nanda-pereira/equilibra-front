@@ -20,6 +20,8 @@ import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import LandingPage from "./pages/landing/LandingPage";
 import { useSession } from "./modules/session/session";
+import MessagesPage from "./pages/app/MessagesPage";
+import MonitoringPage from "./pages/app/MonitoringPage";
 
 function AgendaRoute() {
   const { session } = useSession();
@@ -55,6 +57,8 @@ function App() {
             <Route path="relatorios" element={<ReportsPage />} />
             <Route path="perfil" element={<ProfilePage />} />
             <Route path="configuracoes" element={<SettingsPage />} />
+            <Route path="mensagens" element={<MessagesPage />} />
+            <Route path="monitoramento" element={<MonitoringPage />} />
             <Route path=":section" element={<UnderConstructionPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

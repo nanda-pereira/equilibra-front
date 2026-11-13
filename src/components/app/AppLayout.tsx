@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router";
 import logo from "../../assets/pedras-logo.svg";
@@ -6,6 +7,7 @@ import { useSession } from "../../modules/session/session";
 import Icon from "../ui/Icon";
 import { CloseIcon, LogoutIcon, MenuIcon } from "../ui/icons";
 import AssistantWidget from "./AssistantWidget";
+import NotificationBell from "./NotificationBell";
 import { logoutBackendSession } from "../../modules/auth/sessionApi";
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -22,9 +24,19 @@ type MenuLinksProps = {
   onNavigate?: () => void;
 };
 
-function MenuLinks({ main, bottom, onSignOut, onNavigate }: MenuLinksProps) {
+function MenuLinks({
+  main,
+  bottom,
+  onSignOut,
+  onNavigate,
+}: MenuLinksProps) {
   const renderLink = (item: NavItem) => (
-    <NavLink key={item.path} to={`/app/${item.path}`} onClick={onNavigate} className={linkClass}>
+    <NavLink
+      key={item.path}
+      to={`/app/${item.path}`}
+      onClick={onNavigate}
+      className={linkClass}
+    >
       <Icon icon={item.icon} size={22} />
       {item.label}
     </NavLink>
@@ -32,11 +44,16 @@ function MenuLinks({ main, bottom, onSignOut, onNavigate }: MenuLinksProps) {
 
   return (
     <>
-      <nav aria-label="Navegação principal" className="mt-4 flex flex-1 flex-col gap-1.5 overflow-y-auto">
+      <nav
+        aria-label="Navegação principal"
+        className="mt-4 flex flex-1 flex-col gap-1.5 overflow-y-auto"
+      >
         {main.map(renderLink)}
       </nav>
+
       <div className="flex flex-col gap-1.5 border-t border-line pt-4">
         {bottom.map(renderLink)}
+
         <button
           type="button"
           onClick={onSignOut}
@@ -53,10 +70,17 @@ function MenuLinks({ main, bottom, onSignOut, onNavigate }: MenuLinksProps) {
 function Brand({ small = false }: { small?: boolean }) {
   return (
     <>
-      <img src={logo} alt="" className={small ? "h-8 w-auto" : "h-10 w-auto"} />
+      <img
+        src={logo}
+        alt=""
+        className={small ? "h-8 w-auto" : "h-10 w-auto"}
+      />
+
       <span
         className={`font-semibold text-deep ${
-          small ? "text-sm tracking-[0.28em]" : "text-base tracking-[0.32em]"
+          small
+            ? "text-sm tracking-[0.28em]"
+            : "text-base tracking-[0.32em]"
         }`}
       >
         EQUILIBRA
@@ -68,14 +92,22 @@ function Brand({ small = false }: { small?: boolean }) {
 export default function AppLayout() {
   const { session, signOut } = useSession();
   const navigate = useNavigate();
+
   const [menuOpen, setMenuOpen] = useState(false);
   const drawerRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     const dialog = drawerRef.current;
+
     if (!dialog) return;
-    if (menuOpen && !dialog.open) dialog.showModal();
-    if (!menuOpen && dialog.open) dialog.close();
+
+    if (menuOpen && !dialog.open) {
+      dialog.showModal();
+    }
+
+    if (!menuOpen && dialog.open) {
+      dialog.close();
+    }
   }, [menuOpen]);
 
   if (!session) return null;
@@ -92,7 +124,10 @@ export default function AppLayout() {
         await logoutBackendSession(refreshToken);
       }
     } catch (error) {
-      console.error("Não foi possível revogar a sessão no servidor:", error);
+      console.error(
+        "Não foi possível revogar a sessão no servidor:",
+        error,
+      );
     } finally {
       signOut();
       navigate("/login");
@@ -101,32 +136,55 @@ export default function AppLayout() {
 
   return (
     <div className="relative isolate min-h-svh bg-page">
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+      {/* Elementos decorativos do fundo */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+      >
         <div className="absolute -left-[140px] -top-[100px] size-[520px] rounded-full bg-mint-200/60 blur-[100px]" />
+
         <div className="absolute -bottom-[220px] -right-[180px] size-[560px] rounded-full bg-brand/15 blur-[110px]" />
       </div>
 
       {/* Menu lateral (desktop) */}
       <aside className="glass-card fixed inset-y-4 left-4 z-30 hidden w-64 flex-col rounded-[32px] p-4 lg:flex">
-        <Link to="/app/inicio" aria-label="Equilibra — início" className="flex items-center gap-1.5 px-3 py-3">
+        <Link
+          to="/app/inicio"
+          aria-label="Equilibra — início"
+          className="flex items-center gap-1.5 px-3 py-3"
+        >
           <Brand />
         </Link>
-        <MenuLinks main={nav.main} bottom={nav.bottom} onSignOut={handleSignOut} />
+
+        <MenuLinks
+          main={nav.main}
+          bottom={nav.bottom}
+          onSignOut={handleSignOut}
+        />
       </aside>
 
       {/* Barra superior (celular e tablet) */}
       <header className="glass-card sticky top-3 z-20 mx-3 mt-3 flex h-14 items-center justify-between rounded-full pl-4 pr-2 lg:hidden">
-        <Link to="/app/inicio" aria-label="Equilibra — início" className="flex items-center gap-1.5">
+        <Link
+          to="/app/inicio"
+          aria-label="Equilibra — início"
+          className="flex min-w-0 items-center gap-1.5"
+        >
           <Brand small />
         </Link>
-        <button
-          type="button"
-          onClick={() => setMenuOpen(true)}
-          aria-label="Abrir menu"
-          className="flex size-11 items-center justify-center rounded-full text-action transition-colors hover:bg-mint-100 focus-visible:outline-2 focus-visible:outline-action"
-        >
-          <Icon icon={MenuIcon} size={24} />
-        </button>
+
+        <div className="flex shrink-0 items-center gap-1">
+          <NotificationBell />
+
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Abrir menu"
+            className="flex size-11 items-center justify-center rounded-full text-action transition-colors hover:bg-mint-100 focus-visible:outline-2 focus-visible:outline-action"
+          >
+            <Icon icon={MenuIcon} size={24} />
+          </button>
+        </div>
       </header>
 
       {/* Menu deslizante (celular e tablet) */}
@@ -135,7 +193,9 @@ export default function AppLayout() {
         aria-label="Menu"
         onClose={() => setMenuOpen(false)}
         onClick={(event) => {
-          if (event.target === drawerRef.current) setMenuOpen(false);
+          if (event.target === drawerRef.current) {
+            setMenuOpen(false);
+          }
         }}
         className="m-0 h-svh max-h-none w-[min(86vw,320px)] rounded-r-[32px] border-0 bg-white p-4 text-ink backdrop:bg-deep/40 backdrop:backdrop-blur-sm lg:hidden"
       >
@@ -150,6 +210,7 @@ export default function AppLayout() {
               >
                 <Brand />
               </Link>
+
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}
@@ -159,6 +220,7 @@ export default function AppLayout() {
                 <Icon icon={CloseIcon} size={22} />
               </button>
             </div>
+
             <MenuLinks
               main={nav.main}
               bottom={nav.bottom}
@@ -169,11 +231,18 @@ export default function AppLayout() {
         )}
       </dialog>
 
+      {/* Conteúdo principal */}
       <div className="lg:pl-[18rem]">
+        {/* Sino no desktop */}
+        <div className="mx-auto hidden w-full max-w-[1200px] justify-end px-4 pt-4 sm:px-6 lg:flex lg:px-8">
+          <NotificationBell />
+        </div>
+
         <main className="mx-auto w-full max-w-[1200px] px-4 pb-10 pt-6 sm:px-6 lg:px-8 lg:pt-8">
           <Outlet />
         </main>
       </div>
+
       <AssistantWidget />
     </div>
   );
