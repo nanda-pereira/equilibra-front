@@ -61,12 +61,11 @@ export default function ProblemSection() {
             O que torna o Parkinson ainda mais desafiador?
           </h2>
 
-          {/* Texto provisório do Figma (lorem ipsum). Substituir pelo texto real. */}
           <p className="mt-7 max-w-[460px] text-base leading-[26px] text-ink sm:text-lg sm:leading-[27px]">
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut et massa
-            mi. Aliquam in hendrerit urna. Pellentesque sit amet sapien
-            fringilla, mattis ligula consectetur, ultrices mauris. Maecenas
-            vitae mattis tellus.
+            A doença de Parkinson vai além dos sintomas motores. Mudanças na mobilidade e 
+            na autonomia podem tornar tarefas cotidianas mais difíceis. 
+            A falta de acompanhamento contínuo e de apoio integrado também pode aumentar os 
+            desafios enfrentados por quem convive com a doença e por seus cuidadores.
           </p>
 
           <a
