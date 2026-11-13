@@ -20,7 +20,9 @@ export type RegisterData = {
   confirmPassword: string;
   crm: string;
   specialty: string;
-  consent: boolean;
+  consentTerms: boolean;
+  consentPrivacy: boolean;
+  consentHealthData: boolean;
 };
 
 export const EMPTY_REGISTER_DATA: RegisterData = {
@@ -32,5 +34,7 @@ export const EMPTY_REGISTER_DATA: RegisterData = {
   confirmPassword: "",
   crm: "",
   specialty: "",
-  consent: false,
+  consentTerms: false,
+  consentPrivacy: false,
+  consentHealthData: false,
 };

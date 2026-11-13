@@ -20,6 +20,8 @@ import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import LandingPage from "./pages/landing/LandingPage";
 import { useSession } from "./modules/session/session";
+import TermsOfUsePage from "./pages/legal/TermsOfUsePage";
+import PrivacyPolicyPage from "./pages/legal/PrivacyPolicyPage";
 
 function AgendaRoute() {
   const { session } = useSession();
@@ -34,6 +36,11 @@ function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/cadastro" element={<RegisterPage />} />
+          <Route path="/termos-de-uso" element={<TermsOfUsePage />} />
+          <Route
+            path="/politica-de-privacidade"
+            element={<PrivacyPolicyPage />}
+          />
           <Route path="/login" element={<LoginPage />} />
           <Route
             path="/app"

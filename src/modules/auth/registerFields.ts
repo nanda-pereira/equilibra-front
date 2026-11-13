@@ -1,7 +1,9 @@
 import type { ProfileType, RegisterData } from "./types";
 
-export type FieldKey = Exclude<keyof RegisterData, "consent">;
-export type FieldKind = "text" | "email" | "password" | "cpf" | "date" | "select";
+export type FieldKey = Exclude<
+  keyof RegisterData,
+  "consentTerms" | "consentPrivacy" | "consentHealthData"
+>;export type FieldKind = "text" | "email" | "password" | "cpf" | "date" | "select";
 
 export type FieldConfig = {
   key: FieldKey;

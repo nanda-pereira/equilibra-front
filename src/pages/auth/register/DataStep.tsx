@@ -57,13 +57,25 @@ function validateField(
 
 function validate(profile: ProfileType, data: RegisterData): Errors {
   const errors: Errors = {};
+  const form = PROFILE_FORM[profile];
 
   for (const field of PROFILE_FORM[profile].fields) {
     const message = validateField(field, data);
     if (message) errors[field.key] = message;
   }
 
-  if (!data.consent) errors.consent = "Para continuar, é preciso concordar";
+  if (!data.consentTerms) {
+  errors.consentTerms = "É necessário aceitar os Termos de Uso";
+}
+
+if (!data.consentPrivacy) {
+  errors.consentPrivacy = "É necessário confirmar a leitura da Política de Privacidade";
+}
+
+if (form.sharesHealthData && !data.consentHealthData) {
+  errors.consentHealthData =
+    "É necessário registrar sua decisão sobre o tratamento de dados de saúde";
+}
   return errors;
 }
 
@@ -222,49 +234,108 @@ export default function DataStep({
         </ul>
       </div>
 
-      {/* Consentimento LGPD */}
-      <div className="mx-auto mt-8 w-full max-w-[800px]">
-        <label className="flex items-start gap-2.5 text-sm leading-[19px] text-ink">
-          <span className="relative mt-px flex size-[18px] shrink-0">
+    {/* Aceites e privacidade */}
+    <div className="mx-auto mt-8 w-full max-w-[800px] space-y-4">
+      <label className="flex items-start gap-2.5 text-sm leading-[19px] text-ink">
+        <input
+          type="checkbox"
+          checked={data.consentTerms}
+          onChange={(e) => onChange("consentTerms", e.target.checked)}
+          aria-describedby={
+            shown("consentTerms") ? "consent-terms-error" : undefined
+          }
+          className="mt-px size-[18px] shrink-0 cursor-pointer accent-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+        />
+        <span>
+          Li e aceito os{" "}
+        <a
+          href="/termos-de-uso"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-action-hover underline underline-offset-4"
+        >
+          Termos de Uso
+        </a>
+          .
+        </span>
+      </label>
+      <p
+        id="consent-terms-error"
+        className="min-h-0 text-sm text-alert-text"
+        aria-live="polite"
+      >
+        {shown("consentTerms")}
+      </p>
+
+      <label className="flex items-start gap-2.5 text-sm leading-[19px] text-ink">
+        <input
+          type="checkbox"
+          checked={data.consentPrivacy}
+          onChange={(e) => onChange("consentPrivacy", e.target.checked)}
+          aria-describedby={
+            shown("consentPrivacy") ? "consent-privacy-error" : undefined
+          }
+          className="mt-px size-[18px] shrink-0 cursor-pointer accent-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+        />
+        <span>
+          Li a{" "}
+        <a
+          href="/politica-de-privacidade"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-action-hover underline underline-offset-4"
+        >
+          Política de Privacidade
+        </a>
+          e estou ciente de como meus dados pessoais poderão ser tratados.
+        </span>
+      </label>
+      <p
+        id="consent-privacy-error"
+        className="min-h-0 text-sm text-alert-text"
+        aria-live="polite"
+      >
+        {shown("consentPrivacy")}
+      </p>
+
+      {form.sharesHealthData && (
+        <>
+          <label className="flex items-start gap-2.5 text-sm leading-[19px] text-ink">
             <input
               type="checkbox"
-              checked={data.consent}
-              onChange={(e) => onChange("consent", e.target.checked)}
-              aria-describedby={shown("consent") ? "consent-error" : undefined}
-              className="peer absolute inset-0 size-full cursor-pointer appearance-none rounded-full border border-brand bg-white checked:border-action checked:bg-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+              checked={data.consentHealthData}
+              onChange={(e) => onChange("consentHealthData", e.target.checked)}
+              aria-describedby={
+                shown("consentHealthData")
+                  ? "consent-health-error"
+                  : "consent-health-description"
+              }
+              className="mt-px size-[18px] shrink-0 cursor-pointer accent-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
             />
-            <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-white opacity-0 peer-checked:opacity-100">
-              <Icon icon={CheckIcon} size={12} strokeWidth={2.5} />
+            <span>
+              Autorizo o tratamento dos meus dados de saúde e de monitoramento
+              para as finalidades acadêmicas e experimentais descritas na Política
+              de Privacidade, incluindo o cálculo de métricas e a apresentação de
+              resultados exploratórios.
             </span>
-          </span>
-          <span>
-            Li e concordo com os{" "}
-            {/* TODO: páginas de Termos e Política ainda não existem */}
-            <a
-              href="#"
-              onClick={(e) => e.preventDefault()}
-              className="font-semibold text-action-hover underline"
-            >
-              Termos de Uso
-            </a>{" "}
-            e a{" "}
-            <a
-              href="#"
-              onClick={(e) => e.preventDefault()}
-              className="font-semibold text-action-hover underline"
-            >
-              Política de Privacidade
-            </a>
-            {/* TODO: texto de consentimento dos outros perfis é provisório */}
-            {form.sharesHealthData
-              ? ", incluindo o compartilhamento de dados de saúde com meus cuidadores e médico responsável."
-              : "."}
-          </span>
-        </label>
-        <p id="consent-error" className="mt-1 min-h-5 text-sm text-alert-text">
-          {shown("consent")}
-        </p>
-      </div>
+          </label>
+          <p
+            id="consent-health-description"
+            className="text-xs leading-5 text-ink/65"
+          >
+            Esse tratamento não substitui avaliação médica. Consulte a Política
+            de Privacidade para conhecer as finalidades e os direitos aplicáveis.
+          </p>
+          <p
+            id="consent-health-error"
+            className="min-h-0 text-sm text-alert-text"
+            aria-live="polite"
+          >
+            {shown("consentHealthData")}
+          </p>
+        </>
+      )}
+    </div>
 
       <StepNav onBack={onBack} nextType="submit" />
     </form>
