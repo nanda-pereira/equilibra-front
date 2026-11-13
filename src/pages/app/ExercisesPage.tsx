@@ -188,17 +188,23 @@ export default function ExercisesPage() {
             <p className="text-sm text-ink-soft">
               O progresso não está disponível no momento.
             </p>
-          ) : (
+            ) : (
             <div className="flex flex-col items-center gap-3 text-center">
               <ProgressRing
                 value={completedLogs.length}
-                max={Math.max(exercises.length, completedLogs.length, 1)}
-                label="Registros de exercícios concluídos nesta semana"
+                label="Exercícios concluídos nesta semana"
               />
-              <p className="text-sm text-ink-soft">
+
+              <p className="text-sm font-medium text-deep">
                 {completedLogs.length === 1
-                  ? "1 exercício registrado como concluído nesta semana."
-                  : `${completedLogs.length} exercícios registrados como concluídos nesta semana.`}
+                  ? "1 exercício concluído nesta semana"
+                  : `${completedLogs.length} exercícios concluídos nesta semana`}
+              </p>
+
+              <p className="max-w-xs text-sm text-ink-soft">
+                {completedLogs.length === 0
+                  ? "Seus exercícios concluídos aparecerão aqui ao longo da semana."
+                  : "Este total considera os registros marcados como concluídos nesta semana."}
               </p>
             </div>
           )}
