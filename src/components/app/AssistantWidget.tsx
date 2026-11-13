@@ -375,16 +375,13 @@ function AssistantPanel({ onClose }: { onClose: () => void }) {
       onKeyDown={(event) => {
         if (event.key === "Escape") onClose();
       }}
-      className="fixed bottom-24 right-4 z-40 flex h-[min(720px,calc(100svh-7.5rem))] w-[min(calc(100vw-2rem),440px)] flex-col overflow-hidden rounded-[28px] border border-[#DCECE8] bg-[#F4F9F8] shadow-[0_24px_70px_rgba(18,63,66,0.22)] sm:right-6"
+      className="fixed bottom-24 right-4 z-40 flex h-[min(760px,calc(100svh-7.5rem))] w-[min(calc(100vw-2rem),480px)] flex-col overflow-hidden rounded-[28px] border border-[#DCECE8] bg-[#F4F9F8] shadow-[0_24px_70px_rgba(18,63,66,0.22)] sm:right-6"
     >
       {/* Cabeçalho */}
       <header className="relative shrink-0 overflow-hidden bg-white px-5 pb-4 pt-5">
         <div className="pointer-events-none absolute -right-10 -top-16 size-36 rounded-full bg-[#E5F3F0] opacity-80 blur-2xl" />
 
         <div className="relative flex items-center gap-3">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-[17px] bg-[#EAF5F2]">
-            <img src={logo} alt="" className="h-7 w-auto" />
-          </div>
 
           <div className="min-w-0 flex-1">
             <h2
@@ -589,7 +586,7 @@ function AssistantPanel({ onClose }: { onClose: () => void }) {
                   type="button"
                   onClick={() => void sendMessage(suggestion.text)}
                   disabled={sending}
-                  className="group flex min-h-[100px] flex-col items-start rounded-[18px] border border-[#E0ECE8] bg-white p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[#9CC9C0] hover:shadow-[0_5px_16px_rgba(18,63,66,0.06)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#247477] disabled:opacity-50"
+                  className="group flex min-h-[112px] flex-col items-start rounded-[18px] border border-[#E0ECE8] bg-white p-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[#9CC9C0] hover:shadow-[0_5px_16px_rgba(18,63,66,0.06)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#247477] disabled:opacity-50"
                 >
                   <span className="mb-2.5 flex size-8 items-center justify-center rounded-xl bg-[#EAF5F2] text-[#247477] transition-colors group-hover:bg-[#DDEFEA]">
                     {index === 0 && (

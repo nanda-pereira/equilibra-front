@@ -31,6 +31,7 @@ export default function SettingsPage() {
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   const handlePasswordChange = async (
     event: FormEvent<HTMLFormElement>,
@@ -243,109 +244,212 @@ export default function SettingsPage() {
         </p>
       </GlassCard>
 
+
       <GlassCard title="Segurança da conta">
-        <p className="text-base text-ink-soft">
-          Atualize sua senha para manter sua conta protegida.
-        </p>
-
-        <form
-          className="mt-4 flex flex-col gap-4"
-          onSubmit={handlePasswordChange}
-        >
-          <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="current-password"
-              className="text-sm font-medium text-ink"
-            >
-              Senha atual
-            </label>
-
-            <input
-              id="current-password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={currentPassword}
-              onChange={(event) =>
-                setCurrentPassword(event.target.value)
-              }
-              className="h-14 w-full rounded-full border border-line bg-white px-5 text-base text-ink outline-none transition focus:border-action focus:ring-2 focus:ring-action/20"
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <label
-                htmlFor="new-password"
-                className="text-sm font-medium text-ink"
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#EAF5F2] text-[#247477]">
+              <svg
+                viewBox="0 0 24 24"
+                width="21"
+                height="21"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
               >
-                Nova senha
-              </label>
-
-              <input
-                id="new-password"
-                type="password"
-                autoComplete="new-password"
-                minLength={8}
-                required
-                value={newPassword}
-                onChange={(event) =>
-                  setNewPassword(event.target.value)
-                }
-                className="h-14 w-full rounded-full border border-line bg-white px-5 text-base text-ink outline-none transition focus:border-action focus:ring-2 focus:ring-action/20"
-              />
+                <rect x="4" y="10" width="16" height="11" rx="2.5" />
+                <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                <path d="M12 14v3" />
+              </svg>
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <label
-                htmlFor="confirm-password"
-                className="text-sm font-medium text-ink"
-              >
-                Confirmar nova senha
-              </label>
-
-              <input
-                id="confirm-password"
-                type="password"
-                autoComplete="new-password"
-                minLength={8}
-                required
-                value={confirmPassword}
-                onChange={(event) =>
-                  setConfirmPassword(event.target.value)
-                }
-                className="h-14 w-full rounded-full border border-line bg-white px-5 text-base text-ink outline-none transition focus:border-action focus:ring-2 focus:ring-action/20"
-              />
+            <div className="min-w-0">
+              <h3 className="font-medium text-ink">
+                Senha da conta
+              </h3>
+              <p className="mt-1 text-sm leading-relaxed text-ink-soft">
+                Mantenha seus dados protegidos. Você pode atualizar sua senha
+                quando precisar.
+              </p>
             </div>
           </div>
 
-          {passwordError && (
-            <p
-              role="alert"
-              className="rounded-[20px] bg-error-bg px-4 py-3 text-sm text-error-text"
+          <div className="shrink-0">
+            <SmallButton
+              variant="solid"
+              onClick={() => {
+                setPasswordError("");
+                setPasswordSuccess("");
+                setIsPasswordModalOpen(true);
+              }}
             >
-              {passwordError}
-            </p>
-          )}
-
-          {passwordSuccess && (
-            <p
-              role="status"
-              className="rounded-[20px] bg-success-bg px-4 py-3 text-sm text-success-text"
-            >
-              {passwordSuccess}
-            </p>
-          )}
-
-          <div>
-            <SmallButton type="submit" variant="solid">
-              {changingPassword
-                ? "Alterando senha..."
-                : "Alterar senha"}
+              Trocar senha
             </SmallButton>
           </div>
-        </form>
+        </div>
       </GlassCard>
+
+      {isPasswordModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#123F42]/35 px-4 py-6 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (
+              event.target === event.currentTarget &&
+              !changingPassword
+            ) {
+              setIsPasswordModalOpen(false);
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && !changingPassword) {
+              setIsPasswordModalOpen(false);
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="change-password-title"
+            className="my-auto w-full max-w-[520px] overflow-hidden rounded-[28px] border border-[#DCECE8] bg-[#F4F9F8] shadow-[0_24px_70px_rgba(18,63,66,0.22)]"
+          >
+            <header className="flex items-start justify-between gap-4 border-b border-[#E0ECE8] bg-white px-5 py-5 sm:px-7">
+              <div>
+                <h2
+                  id="change-password-title"
+                  className="text-lg font-semibold tracking-tight text-[#123F42]"
+                >
+                  Trocar senha
+                </h2>
+                <p className="mt-1 text-sm leading-relaxed text-[#586463]">
+                  Confirme sua senha atual e escolha uma nova.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                aria-label="Fechar janela de troca de senha"
+                disabled={changingPassword}
+                onClick={() => setIsPasswordModalOpen(false)}
+                className="flex size-10 shrink-0 items-center justify-center rounded-full text-[#586463] transition-colors hover:bg-[#F0F6F4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#247477] disabled:opacity-50"
+              >
+                <span aria-hidden="true" className="text-2xl leading-none">
+                  ×
+                </span>
+              </button>
+            </header>
+
+            <form
+              className="flex flex-col gap-4 px-5 py-6 sm:px-7"
+              onSubmit={handlePasswordChange}
+            >
+              <div className="flex flex-col gap-1.5">
+                <label
+                  htmlFor="current-password"
+                  className="text-sm font-medium text-ink"
+                >
+                  Senha atual
+                </label>
+
+                <input
+                  id="current-password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={currentPassword}
+                  onChange={(event) =>
+                    setCurrentPassword(event.target.value)
+                  }
+                  className="h-14 w-full rounded-full border border-line bg-white px-5 text-base text-ink outline-none transition focus:border-action focus:ring-2 focus:ring-action/20"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label
+                  htmlFor="new-password"
+                  className="text-sm font-medium text-ink"
+                >
+                  Nova senha
+                </label>
+
+                <input
+                  id="new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                  value={newPassword}
+                  onChange={(event) =>
+                    setNewPassword(event.target.value)
+                  }
+                  className="h-14 w-full rounded-full border border-line bg-white px-5 text-base text-ink outline-none transition focus:border-action focus:ring-2 focus:ring-action/20"
+                />
+                <p className="pl-4 text-xs text-ink-soft">
+                  Utilize pelo menos 8 caracteres.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label
+                  htmlFor="confirm-password"
+                  className="text-sm font-medium text-ink"
+                >
+                  Confirmar nova senha
+                </label>
+
+                <input
+                  id="confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                  value={confirmPassword}
+                  onChange={(event) =>
+                    setConfirmPassword(event.target.value)
+                  }
+                  className="h-14 w-full rounded-full border border-line bg-white px-5 text-base text-ink outline-none transition focus:border-action focus:ring-2 focus:ring-action/20"
+                />
+              </div>
+
+              {passwordError && (
+                <p
+                  role="alert"
+                  className="rounded-[20px] bg-error-bg px-4 py-3 text-sm text-error-text"
+                >
+                  {passwordError}
+                </p>
+              )}
+
+              {passwordSuccess && (
+                <p
+                  role="status"
+                  className="rounded-[20px] bg-success-bg px-4 py-3 text-sm text-success-text"
+                >
+                  {passwordSuccess}
+                </p>
+              )}
+
+              <div className="mt-2 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <SmallButton
+                  onClick={() => setIsPasswordModalOpen(false)}
+                >
+                  {passwordSuccess ? "Concluir" : "Cancelar"}
+                </SmallButton>
+
+                {!passwordSuccess && (
+                  <SmallButton type="submit" variant="solid">
+                    {changingPassword
+                      ? "Alterando senha..."
+                      : "Alterar senha"}
+                  </SmallButton>
+                )}
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
 
       <GlassCard title="Conta">
         <p className="text-base text-ink">
