@@ -1,5 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
+import Avatar from "../../components/app/Avatar";
+import EmptyState from "../../components/app/EmptyState";
+import GlassCard from "../../components/app/GlassCard";
+import Modal from "../../components/app/Modal";
+import PageHeader from "../../components/app/PageHeader";
+import SmallButton from "../../components/app/SmallButton";
+import Icon from "../../components/ui/Icon";
+import { ChevronLeftIcon, MessageIcon, PlusIcon } from "../../components/ui/icons";
+import { usePreferences } from "../../modules/app/preferences";
 import { useSession } from "../../modules/session/session";
 import {
   createConversation,
@@ -14,161 +23,192 @@ import {
   getMyPatientCareNetwork,
   getMyPatientProfileId,
 } from "../../services/api/patients";
-import GlassCard from "../../components/app/GlassCard";
-import PageHeader from "../../components/app/PageHeader";
 
-type Person = {
-  id: string;
-  name: string;
-};
-
-type PatientOption = {
-  id: string;
-  name: string;
-  userId?: string;
-};
+type Person = { id: string; name: string; role?: string };
+type PatientOption = { id: string; name: string; userId?: string };
 
 type LinkOption = {
   _id?: string;
   status?: string;
   relationship?: string;
   permissions?: string[];
-  userId?:
-    | string
-    | {
-        _id?: string;
-        id?: string;
-        fullName?: string;
-        email?: string;
-      };
+  userId?: string | { _id?: string; id?: string; fullName?: string; email?: string };
   patientId?:
     | string
     | {
         _id?: string;
         id?: string;
-        userId?:
-          | string
-          | {
-              _id?: string;
-              id?: string;
-              fullName?: string;
-              email?: string;
-            };
+        userId?: string | { _id?: string; id?: string; fullName?: string; email?: string };
       };
+};
+
+type Row =
+  | { kind: "day"; key: string; label: string }
+  | { kind: "message"; key: string; message: MessageRecord; mine: boolean; first: boolean; time: string };
+
+const COMM_READ = "patient.communication.read";
+const COMM_SEND = "patient.communication.send";
+
+const ROLE_LABELS: Record<string, string> = {
+  CLINICAL_CAREGIVER: "Cuidador clínico",
+  HOME_CAREGIVER: "Cuidador domiciliar",
+  PROFESSIONAL: "Profissional de saúde",
+  NEUROLOGIST: "Neurologista",
 };
 
 function getId(value: unknown): string {
   if (typeof value === "string") return value;
-
   if (value && typeof value === "object") {
     const item = value as { _id?: string; id?: string };
     return item._id ?? item.id ?? "";
   }
-
   return "";
 }
 
 function getName(value: unknown, fallback = "Usuário"): string {
   if (value && typeof value === "object") {
-    const item = value as {
-      fullName?: string;
-      name?: string;
-      email?: string;
-    };
-
+    const item = value as { fullName?: string; name?: string; email?: string };
     return item.fullName ?? item.name ?? item.email ?? fallback;
   }
-
   return fallback;
 }
 
-function formatDate(value?: string) {
-  if (!value) return "";
+function participantIds(conversation: ConversationRecord): string[] {
+  const raw = (conversation.data as { participantIds?: unknown }).participantIds;
+  return Array.isArray(raw) ? raw.map(getId).filter(Boolean) : [];
+}
 
+function toDate(value?: string): Date | null {
+  if (!value) return null;
   const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 
-  if (Number.isNaN(date.getTime())) return "";
+function sameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
 
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+function formatTime(value?: string) {
+  const date = toDate(value);
+  return date
+    ? new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(date)
+    : "";
+}
+
+function formatShort(value?: string) {
+  const date = toDate(value);
+  if (!date) return "";
+  const now = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(now.getDate() - 1);
+  if (sameDay(date, now)) return formatTime(value);
+  if (sameDay(date, yesterday)) return "Ontem";
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(date);
+}
+
+function dayLabel(date: Date) {
+  const now = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(now.getDate() - 1);
+  if (sameDay(date, now)) return "Hoje";
+  if (sameDay(date, yesterday)) return "Ontem";
+  const options: Intl.DateTimeFormatOptions = { day: "numeric", month: "long" };
+  if (date.getFullYear() !== now.getFullYear()) options.year = "numeric";
+  return new Intl.DateTimeFormat("pt-BR", options).format(date);
+}
+
+function ListSkeleton() {
+  return (
+    <ul aria-hidden="true" className="flex flex-col gap-2 p-3">
+      {[0, 1, 2].map((item) => (
+        <li key={item} className="flex items-center gap-3 rounded-2xl px-3 py-3 motion-safe:animate-pulse">
+          <span className="size-10 shrink-0 rounded-full bg-mint-200/70" />
+          <span className="flex-1 space-y-2">
+            <span className="block h-3.5 w-2/3 rounded-full bg-mint-200/70" />
+            <span className="block h-3 w-1/3 rounded-full bg-mint-100" />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ThreadSkeleton() {
+  return (
+    <div aria-hidden="true" className="flex flex-col gap-3 motion-safe:animate-pulse">
+      <span className="h-12 w-3/5 rounded-2xl rounded-bl-md bg-mint-100" />
+      <span className="ml-auto h-12 w-1/2 rounded-2xl rounded-br-md bg-mint-200/70" />
+      <span className="h-12 w-2/5 rounded-2xl rounded-bl-md bg-mint-100" />
+    </div>
+  );
 }
 
 export default function MessagesPage() {
   const { session } = useSession();
+  const { reduceMotion } = usePreferences();
   const [searchParams] = useSearchParams();
 
   const requestedPatientId = searchParams.get("paciente") ?? "";
   const isPatient = session?.profile === "paciente";
-  const isClinicalCaregiver =
-    session?.profile === "cuidador-clinico";
+  const isClinicalCaregiver = session?.profile === "cuidador-clinico";
 
   const [patientId, setPatientId] = useState("");
   const [patients, setPatients] = useState<PatientOption[]>([]);
   const [contacts, setContacts] = useState<Person[]>([]);
+  const [awaitingEnable, setAwaitingEnable] = useState(0);
   const [conversations, setConversations] = useState<ConversationRecord[]>([]);
   const [messages, setMessages] = useState<MessageRecord[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState("");
-  const [selectedContactId, setSelectedContactId] = useState("");
+  const [mobileView, setMobileView] = useState<"list" | "thread">("list");
   const [draft, setDraft] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [initializing, setInitializing] = useState(true);
+  const [loadingList, setLoadingList] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState("");
+  const [creatingId, setCreatingId] = useState("");
+  const [newOpen, setNewOpen] = useState(false);
+  const [setupError, setSetupError] = useState("");
+  const [listError, setListError] = useState("");
+  const [threadError, setThreadError] = useState("");
+  const [sendError, setSendError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+  const [hasNew, setHasNew] = useState(false);
 
-  const selectedConversation = useMemo(
-    () => conversations.find((item) => item._id === selectedConversationId),
-    [conversations, selectedConversationId],
-  );
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stickToBottom = useRef(true);
 
-  const selectedContact = useMemo(
-    () => contacts.find((item) => item.id === selectedContactId),
-    [contacts, selectedContactId],
-  );
-
+  /* ---------- carregamento inicial (mesma lógica de antes) ---------- */
   useEffect(() => {
     let cancelled = false;
 
     async function initialize() {
       if (!session?.accessToken || !session.userId) {
-        setLoading(false);
-        setError(
-          "Sua sessão não possui as informações necessárias para acessar as mensagens.",
-        );
+        setInitializing(false);
+        setSetupError("Sua sessão não possui as informações necessárias para acessar as mensagens.");
         return;
       }
 
-      setLoading(true);
-      setError("");
+      setInitializing(true);
+      setSetupError("");
 
       try {
         if (isPatient) {
-          // Fluxo do paciente: carrega o próprio cadastro e sua rede de cuidado.
-          const ownPatientId = await getMyPatientProfileId(
-            session.accessToken,
-            session.userId,
-          );
+          const ownPatientId = await getMyPatientProfileId(session.accessToken, session.userId);
+          if (!ownPatientId) throw new Error("Não encontramos seu cadastro de paciente.");
 
-          if (!ownPatientId) {
-            throw new Error("Não encontramos seu cadastro de paciente.");
-          }
+          const links = (await getMyPatientCareNetwork(session.accessToken)) as LinkOption[];
 
-          const links = (await getMyPatientCareNetwork(
-            session.accessToken,
-          )) as LinkOption[];
-
-          const allowedContacts: Person[] = links
+          const allowed: Person[] = links
             .filter((link) => {
               const permissions = link.permissions ?? [];
-
               return (
                 link.status === "ACTIVE" &&
-                permissions.includes("patient.communication.read") &&
-                permissions.includes("patient.communication.send") &&
+                permissions.includes(COMM_READ) &&
+                permissions.includes(COMM_SEND) &&
                 Boolean(getId(link.userId)) &&
                 getId(link.userId) !== session.userId
               );
@@ -176,44 +216,44 @@ export default function MessagesPage() {
             .map((link) => ({
               id: getId(link.userId),
               name: getName(link.userId, "Contato da equipe de cuidado"),
+              role: ROLE_LABELS[link.relationship ?? ""] ?? "Equipe de cuidado",
             }));
+
+          // cuidadores clínicos com vínculo ativo, mas sem comunicação habilitada
+          const blocked = links.filter((link) => {
+            const permissions = link.permissions ?? [];
+            return (
+              link.status === "ACTIVE" &&
+              link.relationship === "CLINICAL_CAREGIVER" &&
+              !(permissions.includes(COMM_READ) && permissions.includes(COMM_SEND))
+            );
+          }).length;
 
           if (cancelled) return;
 
           setPatientId(ownPatientId);
           setPatients([]);
+          setAwaitingEnable(blocked);
           setContacts(
-            allowedContacts.filter(
-              (contact, index, list) =>
-                list.findIndex((item) => item.id === contact.id) === index,
-            ),
+            allowed.filter((contact, index, list) => list.findIndex((item) => item.id === contact.id) === index),
           );
-          setSelectedContactId("");
         } else if (isClinicalCaregiver) {
-          // Fluxo do cuidador clínico: usa apenas os vínculos do próprio usuário.
-          const links = (await getMyPatientCareNetwork(
-            session.accessToken,
-          )) as LinkOption[];
+          const links = (await getMyPatientCareNetwork(session.accessToken)) as LinkOption[];
 
           const options: PatientOption[] = links
             .filter((link) => {
               const permissions = link.permissions ?? [];
-
               return (
                 link.status === "ACTIVE" &&
                 link.relationship === "CLINICAL_CAREGIVER" &&
-                permissions.includes("patient.communication.read") &&
-                permissions.includes("patient.communication.send")
+                permissions.includes(COMM_READ) &&
+                permissions.includes(COMM_SEND)
               );
             })
             .map((link) => {
               const linkedPatient = link.patientId;
-
               const patientUser =
-                linkedPatient && typeof linkedPatient === "object"
-                  ? linkedPatient.userId
-                  : undefined;
-
+                linkedPatient && typeof linkedPatient === "object" ? linkedPatient.userId : undefined;
               return {
                 id: getId(linkedPatient),
                 name: getName(patientUser, "Paciente"),
@@ -221,19 +261,12 @@ export default function MessagesPage() {
               };
             })
             .filter((patient) => Boolean(patient.id && patient.userId))
-            .filter(
-              (patient, index, list) =>
-                list.findIndex((item) => item.id === patient.id) === index,
-            );
+            .filter((patient, index, list) => list.findIndex((item) => item.id === patient.id) === index);
 
           if (cancelled) return;
-
           setPatients(options);
 
-          const selected =
-            options.find((item) => item.id === requestedPatientId) ??
-            options[0];
-
+          const selected = options.find((item) => item.id === requestedPatientId) ?? options[0];
           if (!selected) {
             throw new Error(
               "Você não possui pacientes com vínculo ativo e permissão para trocar mensagens.",
@@ -241,88 +274,49 @@ export default function MessagesPage() {
           }
 
           setPatientId(selected.id);
-
-          setContacts([
-            {
-              id: selected.userId!,
-              name: selected.name,
-            },
-          ]);
-
-          setSelectedContactId("");
+          setContacts([{ id: selected.userId!, name: selected.name, role: "Paciente" }]);
         } else {
-          // Fluxo original dos profissionais, incluindo médicos.
-          const accessiblePatients = await getAccessiblePatients(
-            session.accessToken,
-          );
+          const accessiblePatients = await getAccessiblePatients(session.accessToken);
 
           const options: PatientOption[] = accessiblePatients
-            .map((patient) => {
-              const ownerId = getId(patient.userId);
-
-              return {
-                id: patient._id ?? patient.id ?? "",
-                name: getName(patient.userId, "Paciente"),
-                userId: ownerId,
-              };
-            })
+            .map((patient) => ({
+              id: patient._id ?? patient.id ?? "",
+              name: getName(patient.userId, "Paciente"),
+              userId: getId(patient.userId),
+            }))
             .filter((patient) => Boolean(patient.id));
 
           if (cancelled) return;
-
           setPatients(options);
 
-          const selected =
-            options.find((item) => item.id === requestedPatientId) ??
-            options[0];
-
-          if (!selected) {
-            throw new Error(
-              "Você ainda não possui pacientes disponíveis para consultar.",
-            );
-          }
+          const selected = options.find((item) => item.id === requestedPatientId) ?? options[0];
+          if (!selected) throw new Error("Você ainda não possui pacientes disponíveis para consultar.");
 
           setPatientId(selected.id);
-
-          if (selected.userId && selected.userId !== session.userId) {
-            setContacts([
-              {
-                id: selected.userId,
-                name: selected.name,
-              },
-            ]);
-          } else {
-            setContacts([]);
-          }
-
-          setSelectedContactId("");
+          setContacts(
+            selected.userId && selected.userId !== session.userId
+              ? [{ id: selected.userId, name: selected.name, role: "Paciente" }]
+              : [],
+          );
         }
       } catch (cause) {
         if (!cancelled) {
-          setError(
-            cause instanceof Error
-              ? cause.message
-              : "Não foi possível carregar os dados de mensagens.",
+          setSetupError(
+            cause instanceof Error ? cause.message : "Não foi possível carregar os dados de mensagens.",
           );
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setInitializing(false);
       }
     }
 
     void initialize();
-
     return () => {
       cancelled = true;
     };
-  }, [
-    session?.accessToken,
-    session?.userId,
-    isPatient,
-    isClinicalCaregiver,
-    requestedPatientId,
-  ]);
+  }, [session?.accessToken, session?.userId, isPatient, isClinicalCaregiver, requestedPatientId]);
 
+  /* ---------- conversas do paciente selecionado ---------- */
   useEffect(() => {
     let cancelled = false;
 
@@ -333,79 +327,60 @@ export default function MessagesPage() {
         return;
       }
 
-      setLoading(true);
-      setError("");
+      setLoadingList(true);
+      setListError("");
 
       try {
-        const result = await getConversations(
-          session.accessToken,
-          patientId,
-        );
-
+        const result = await getConversations(session.accessToken, patientId);
         if (cancelled) return;
 
-        setConversations(result);
+        const ordered = [...result].sort(
+          (a, b) =>
+            (toDate(b.updatedAt ?? b.createdAt)?.getTime() ?? 0) -
+            (toDate(a.updatedAt ?? a.createdAt)?.getTime() ?? 0),
+        );
 
-        setSelectedConversationId((current) => {
-          if (current && result.some((item) => item._id === current)) {
-            return current;
-          }
-
-          return result[0]?._id ?? "";
-        });
+        setConversations(ordered);
+        setSelectedConversationId((current) =>
+          current && ordered.some((item) => item._id === current) ? current : (ordered[0]?._id ?? ""),
+        );
       } catch (cause) {
         if (!cancelled) {
-          setError(
-            cause instanceof Error
-              ? cause.message
-              : "Não foi possível carregar as conversas.",
-          );
+          setListError(cause instanceof Error ? cause.message : "Não foi possível carregar as conversas.");
           setConversations([]);
           setSelectedConversationId("");
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadingList(false);
       }
     }
 
     void loadConversations();
-
     return () => {
       cancelled = true;
     };
-  }, [session?.accessToken, patientId]);
+  }, [session?.accessToken, patientId, reloadKey]);
 
+  /* ---------- mensagens da conversa aberta ---------- */
   useEffect(() => {
     let cancelled = false;
 
     async function loadMessages() {
-      if (
-        !session?.accessToken ||
-        !patientId ||
-        !selectedConversationId
-      ) {
+      if (!session?.accessToken || !patientId || !selectedConversationId) {
         setMessages([]);
         return;
       }
 
       setLoadingMessages(true);
+      setThreadError("");
 
       try {
-        const result = await getMessages(
-          session.accessToken,
-          patientId,
-          selectedConversationId,
-        );
-
+        const result = await getMessages(session.accessToken, patientId, selectedConversationId);
         if (!cancelled) setMessages(result);
       } catch (cause) {
         if (!cancelled) {
           setMessages([]);
-          setError(
-            cause instanceof Error
-              ? cause.message
-              : "Não foi possível carregar o histórico.",
-          );
+          setThreadError(cause instanceof Error ? cause.message : "Não foi possível carregar o histórico.");
         }
       } finally {
         if (!cancelled) setLoadingMessages(false);
@@ -413,389 +388,591 @@ export default function MessagesPage() {
     }
 
     void loadMessages();
-
     return () => {
       cancelled = true;
     };
+  }, [session?.accessToken, patientId, selectedConversationId, reloadKey]);
+
+  /* ---------- atualização periódica (o backend ainda não tem tempo real) ---------- */
+  useEffect(() => {
+    if (!session?.accessToken || !patientId || !selectedConversationId) return undefined;
+    const token = session.accessToken;
+
+    const timer = window.setInterval(async () => {
+      if (document.hidden) return;
+      try {
+        const result = await getMessages(token, patientId, selectedConversationId);
+        setMessages((current) => {
+          const sameSize = current.length === result.length;
+          const sameLast = current[current.length - 1]?._id === result[result.length - 1]?._id;
+          return sameSize && sameLast ? current : result;
+        });
+      } catch {
+        /* falha silenciosa: a próxima tentativa corrige */
+      }
+    }, 15000);
+
+    return () => window.clearInterval(timer);
   }, [session?.accessToken, patientId, selectedConversationId]);
 
-  async function handleCreateConversation() {
-    if (
-      !session?.accessToken ||
-      !session.userId ||
-      !patientId ||
-      !selectedContact
-    ) {
-      setError("Selecione um contato autorizado para iniciar a conversa.");
+  /* ---------- dados derivados ---------- */
+  const people = useMemo(() => {
+    const map = new Map<string, Person>();
+    contacts.forEach((contact) => map.set(contact.id, contact));
+    patients.forEach((patient) => {
+      if (patient.userId) map.set(patient.userId, { id: patient.userId, name: patient.name, role: "Paciente" });
+    });
+    return map;
+  }, [contacts, patients]);
+
+  function otherPerson(conversation: ConversationRecord): Person | null {
+    for (const id of participantIds(conversation)) {
+      if (id === session?.userId) continue;
+      const person = people.get(id);
+      if (person) return person;
+    }
+    return null;
+  }
+
+  const conversationName = (conversation: ConversationRecord) =>
+    otherPerson(conversation)?.name || conversation.data.title?.trim() || "Conversa";
+
+  const selectedConversation = conversations.find((item) => item._id === selectedConversationId);
+
+  const sortedMessages = useMemo(
+    () =>
+      [...messages].sort(
+        (a, b) =>
+          (toDate(a.data.sentAt ?? a.createdAt)?.getTime() ?? 0) -
+          (toDate(b.data.sentAt ?? b.createdAt)?.getTime() ?? 0),
+      ),
+    [messages],
+  );
+
+  const rows = useMemo<Row[]>(() => {
+    const result: Row[] = [];
+    let previous: MessageRecord | null = null;
+    let previousDate: Date | null = null;
+
+    for (const message of sortedMessages) {
+      const stamp = message.data.sentAt ?? message.createdAt;
+      const date = toDate(stamp);
+
+      if (date && (!previousDate || !sameDay(date, previousDate))) {
+        result.push({ kind: "day", key: `day-${message._id}`, label: dayLabel(date) });
+      }
+
+      const grouped = Boolean(
+        previous &&
+          previousDate &&
+          date &&
+          previous.data.senderId === message.data.senderId &&
+          sameDay(date, previousDate) &&
+          date.getTime() - previousDate.getTime() < 5 * 60 * 1000,
+      );
+
+      result.push({
+        kind: "message",
+        key: message._id,
+        message,
+        mine: Boolean(session?.userId) && message.data.senderId === session?.userId,
+        first: !grouped,
+        time: formatTime(stamp),
+      });
+
+      previous = message;
+      previousDate = date;
+    }
+
+    return result;
+  }, [sortedMessages, session?.userId]);
+
+  /* ---------- rolagem ---------- */
+  const lastMessage = sortedMessages[sortedMessages.length - 1];
+
+  useEffect(() => {
+    if (loadingMessages) return;
+    const element = scrollRef.current;
+    if (!element || !lastMessage) return;
+
+    const mine = Boolean(session?.userId) && lastMessage.data.senderId === session?.userId;
+
+    if (stickToBottom.current || mine) {
+      element.scrollTo({ top: element.scrollHeight, behavior: reduceMotion ? "auto" : "smooth" });
+      setHasNew(false);
+    } else {
+      setHasNew(true);
+    }
+  }, [lastMessage?._id, loadingMessages, session?.userId, reduceMotion]);
+
+  function handleScroll() {
+    const element = scrollRef.current;
+    if (!element) return;
+    const near = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+    stickToBottom.current = near;
+    if (near) setHasNew(false);
+  }
+
+  function jumpToLatest() {
+    const element = scrollRef.current;
+    if (!element) return;
+    element.scrollTo({ top: element.scrollHeight, behavior: reduceMotion ? "auto" : "smooth" });
+    stickToBottom.current = true;
+    setHasNew(false);
+  }
+
+  /* ---------- ações ---------- */
+  function openConversation(id: string) {
+    stickToBottom.current = true;
+    if (id !== selectedConversationId) setMessages([]);
+    setSelectedConversationId(id);
+    setSendError("");
+    setMobileView("thread");
+  }
+
+  function changePatient(nextPatientId: string) {
+    const patient = patients.find((item) => item.id === nextPatientId);
+    setPatientId(nextPatientId);
+    setContacts(patient?.userId ? [{ id: patient.userId, name: patient.name, role: "Paciente" }] : []);
+    setConversations([]);
+    setMessages([]);
+    setSelectedConversationId("");
+    setMobileView("list");
+  }
+
+  async function handleOpenContact(contact: Person) {
+    const existing = conversations.find((item) => participantIds(item).includes(contact.id));
+    if (existing) {
+      openConversation(existing._id);
+      setNewOpen(false);
       return;
     }
 
-    setCreating(true);
-    setError("");
+    if (!session?.accessToken || !session.userId || !patientId) return;
+
+    setCreatingId(contact.id);
+    setListError("");
 
     try {
-      const conversation = await createConversation(
-        session.accessToken,
-        patientId,
-        selectedContact.name,
-        [session.userId, selectedContact.id],
-      );
-
-      setConversations((current) => [
-        conversation,
-        ...current.filter((item) => item._id !== conversation._id),
+      const conversation = await createConversation(session.accessToken, patientId, contact.name, [
+        session.userId,
+        contact.id,
       ]);
-
-      setSelectedConversationId(conversation._id);
+      setConversations((current) => [conversation, ...current.filter((item) => item._id !== conversation._id)]);
+      openConversation(conversation._id);
       setMessages([]);
+      setNewOpen(false);
     } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Não foi possível iniciar a conversa.",
-      );
+      setListError(cause instanceof Error ? cause.message : "Não foi possível iniciar a conversa.");
+      setNewOpen(false);
     } finally {
-      setCreating(false);
+      setCreatingId("");
     }
   }
 
   async function handleSendMessage() {
-    if (
-      !session?.accessToken ||
-      !patientId ||
-      !selectedConversationId ||
-      !draft.trim()
-    ) {
-      return;
-    }
+    const text = draft.trim();
+    if (!session?.accessToken || !patientId || !selectedConversationId || !text || sending) return;
 
     setSending(true);
-    setError("");
+    setSendError("");
 
     try {
-      const message = await sendMessage(
-        session.accessToken,
-        patientId,
-        selectedConversationId,
-        draft,
-      );
-
-      setMessages((current) => [
-        ...current.filter((item) => item._id !== message._id),
-        message,
-      ]);
-
+      const message = await sendMessage(session.accessToken, patientId, selectedConversationId, text);
+      stickToBottom.current = true;
+      setMessages((current) => [...current.filter((item) => item._id !== message._id), message]);
       setDraft("");
     } catch (cause) {
-      setError(
+      setSendError(
         cause instanceof Error
-          ? cause.message
-          : "Não foi possível enviar a mensagem.",
+          ? `${cause.message} Sua mensagem foi mantida para você tentar de novo.`
+          : "Não foi possível enviar. Sua mensagem foi mantida para você tentar de novo.",
       );
     } finally {
       setSending(false);
     }
   }
 
-  const conversationTitle = (conversation: ConversationRecord) => {
-    if (isClinicalCaregiver) {
-      return (
-        patients.find((patient) => patient.id === patientId)?.name ||
-        conversation.data.title?.trim() ||
-        "Conversa"
-      );
-    }
-
-    return conversation.data.title?.trim() || "Conversa";
-  };
-
-  if (
-    !session ||
-    !["paciente", "medico", "cuidador-clinico"].includes(session.profile)
-  ) {
+  /* ---------- perfis sem acesso ---------- */
+  if (!session || !["paciente", "medico", "cuidador-clinico"].includes(session.profile)) {
     return (
-      <main className="space-y-5">
-        <PageHeader
-          title="Mensagens"
-          subtitle="Comunicação entre o paciente e sua equipe de cuidado."
-        />
+      <div className="flex flex-col gap-6">
+        <PageHeader title="Mensagens" subtitle="Comunicação entre o paciente e sua equipe de cuidado." />
         <GlassCard>
-          <p className="text-sm text-ink-soft">
-            Esta área está disponível para os perfis autorizados.
-          </p>
+          <EmptyState title="Área indisponível para este perfil" />
         </GlassCard>
-      </main>
+      </div>
     );
   }
 
-  return (
-    <main className="space-y-5">
-      <PageHeader
-        title="Mensagens"
-        subtitle="Um espaço de comunicação entre pacientes e profissionais de cuidado."
-      />
-
-      {error && (
-        <div
-          role="alert"
-          className="rounded-[20px] bg-alert-bg px-4 py-3 text-sm text-alert-text"
-        >
-          {error}
-        </div>
-      )}
-
-      {!isPatient && patients.length > 0 && (
-        <GlassCard title="Paciente">
-          <label
-            htmlFor="messages-patient"
-            className="mb-2 block text-sm font-medium text-ink"
-          >
-            Selecione o paciente
-          </label>
-          <select
-            id="messages-patient"
-            value={patientId}
-            onChange={(event) => {
-              const nextPatientId = event.target.value;
-              const patient = patients.find(
-                (item) => item.id === nextPatientId,
-              );
-
-              setPatientId(nextPatientId);
-              setContacts(
-                patient?.userId
-                  ? [{ id: patient.userId, name: patient.name }]
-                  : [],
-              );
-              setSelectedContactId("");
-              setConversations([]);
-              setMessages([]);
-              setSelectedConversationId("");
-            }}
-            className="min-h-12 w-full rounded-2xl border border-field-border bg-white px-4 text-sm text-ink outline-none focus:border-action"
-          >
-            {patients.map((patient) => (
-              <option key={patient.id} value={patient.id}>
-                {patient.name}
-              </option>
-            ))}
-          </select>
-        </GlassCard>
-      )}
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(260px,0.8fr)_minmax(0,1.5fr)]">
-        <GlassCard
-          title="Suas conversas"
-          description="Conversas disponíveis para sua conta."
-        >
-          {loading ? (
-            <p className="py-6 text-sm text-ink-soft">
-              Carregando conversas...
-            </p>
-          ) : conversations.length === 0 ? (
-            <div className="space-y-4">
-              <p className="text-sm leading-6 text-ink-soft">
-                Nenhuma conversa encontrada para este paciente.
-              </p>
-
-              {contacts.length > 0 ? (
-                <>
-                  <label
-                    htmlFor="messages-contact"
-                    className="block text-sm font-medium text-ink"
-                  >
-                    Iniciar conversa com
-                  </label>
-                  <select
-                    id="messages-contact"
-                    value={selectedContactId}
-                    onChange={(event) =>
-                      setSelectedContactId(event.target.value)
-                    }
-                    className="min-h-12 w-full rounded-2xl border border-field-border bg-white px-4 text-sm text-ink outline-none focus:border-action"
-                  >
-                    <option value="">Selecione um contato</option>
-                    {contacts.map((contact) => (
-                      <option key={contact.id} value={contact.id}>
-                        {contact.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => void handleCreateConversation()}
-                    disabled={!selectedContactId || creating}
-                    className="min-h-12 w-full rounded-full bg-action px-5 text-sm font-medium text-white transition hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {creating ? "Criando conversa..." : "Nova conversa"}
-                  </button>
-                </>
-              ) : (
-                <p className="text-sm text-ink-soft">
-                  {isPatient
-                    ? "Para conversar, é necessário ter um vínculo ativo com permissão de comunicação."
-                    : "Não encontramos um paciente com um usuário associado para iniciar a conversa."}
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {conversations.map((conversation) => (
-                <button
-                  key={conversation._id}
-                  type="button"
-                  onClick={() => setSelectedConversationId(conversation._id)}
-                  className={`w-full rounded-2xl border p-4 text-left transition ${
-                    selectedConversationId === conversation._id
-                      ? "border-mint-200 bg-mint-100"
-                      : "border-transparent bg-white/60 hover:bg-white"
-                  }`}
-                >
-                  <span className="block font-medium text-deep">
-                    {conversationTitle(conversation)}
-                  </span>
-                  <span className="mt-1 block text-xs text-ink-soft">
-                    {formatDate(
-                      conversation.updatedAt ?? conversation.createdAt,
-                    )}
-                  </span>
-                </button>
-              ))}
-
-              {contacts.length > 0 && (
-                <div className="border-t border-line pt-4">
-                  <label
-                    htmlFor="messages-new-contact"
-                    className="mb-2 block text-sm font-medium text-ink"
-                  >
-                    Novo contato
-                  </label>
-                  <select
-                    id="messages-new-contact"
-                    value={selectedContactId}
-                    onChange={(event) =>
-                      setSelectedContactId(event.target.value)
-                    }
-                    className="min-h-12 w-full rounded-2xl border border-field-border bg-white px-4 text-sm text-ink outline-none focus:border-action"
-                  >
-                    <option value="">Selecione um contato</option>
-                    {contacts.map((contact) => (
-                      <option key={contact.id} value={contact.id}>
-                        {contact.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => void handleCreateConversation()}
-                    disabled={!selectedContactId || creating}
-                    className="mt-3 min-h-11 w-full rounded-full border border-action px-4 text-sm font-medium text-action transition hover:bg-mint-100 disabled:opacity-50"
-                  >
-                    {creating ? "Criando..." : "Iniciar nova conversa"}
-                  </button>
-                </div>
-              )}
+  if (!initializing && setupError) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title="Mensagens" subtitle="Comunicação entre o paciente e sua equipe de cuidado." />
+        <GlassCard>
+          <EmptyState
+            title="Mensagens indisponíveis por enquanto"
+            description={
+              isClinicalCaregiver
+                ? `${setupError} O paciente precisa habilitar a comunicação com você na tela "Minha rede" dele.`
+                : setupError
+            }
+          />
+          {isPatient && (
+            <div className="mt-4 flex justify-center">
+              <SmallButton to="/app/rede-de-cuidado">Ir para Minha rede</SmallButton>
             </div>
           )}
         </GlassCard>
+      </div>
+    );
+  }
 
-        <GlassCard
-          title={
-            selectedConversation
-              ? conversationTitle(selectedConversation)
-              : "Conversa"
-          }
-          description="Mensagens enviadas e recebidas."
+  const listBusy = initializing || loadingList;
+  const nearLimit = draft.length > 4500;
+
+  return (
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="Mensagens"
+        subtitle="Converse com as pessoas autorizadas a acompanhar o cuidado."
+      />
+
+      {!isPatient && patients.length > 1 && (
+        <GlassCard title="Paciente">
+          <div role="group" aria-label="Escolher paciente" className="flex flex-wrap gap-2.5">
+            {patients.map((patient) => {
+              const active = patient.id === patientId;
+              return (
+                <button
+                  key={patient.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => changePatient(patient.id)}
+                  className={`inline-flex h-11 items-center rounded-full px-5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action ${
+                    active
+                      ? "bg-action text-white shadow-[0_8px_20px_rgba(36,116,119,0.25)]"
+                      : "border border-brand text-action hover:bg-mint-100"
+                  }`}
+                >
+                  {patient.name}
+                </button>
+              );
+            })}
+          </div>
+        </GlassCard>
+      )}
+
+      {isPatient && awaitingEnable > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] bg-info-bg px-4 py-3 text-sm text-info-text">
+          <p>
+            {awaitingEnable === 1
+              ? "Você tem 1 cuidador clínico com vínculo ativo, mas sem comunicação habilitada."
+              : `Você tem ${awaitingEnable} cuidadores clínicos com vínculo ativo, mas sem comunicação habilitada.`}
+          </p>
+          <SmallButton to="/app/rede-de-cuidado">Habilitar em Minha rede</SmallButton>
+        </div>
+      )}
+
+      {listError && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] bg-alert-bg px-4 py-3 text-sm text-alert-text"
         >
-          {!selectedConversationId ? (
-            <div className="flex min-h-64 items-center justify-center rounded-2xl bg-white/50 p-6 text-center">
-              <p className="max-w-sm text-sm leading-6 text-ink-soft">
-                Selecione uma conversa para visualizar as mensagens ou inicie
-                uma nova com um contato autorizado.
+          <p>{listError}</p>
+          <button
+            type="button"
+            onClick={() => setReloadKey((value) => value + 1)}
+            className="min-h-11 rounded-full px-4 font-medium underline underline-offset-4"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      )}
+
+      <div className="glass-card flex h-[min(720px,calc(100svh-14rem))] min-h-[520px] overflow-hidden rounded-3xl">
+        {/* ----- lista de conversas ----- */}
+        <aside
+          aria-label="Conversas"
+          className={`${mobileView === "thread" ? "hidden" : "flex"} w-full flex-col border-line lg:flex lg:w-[340px] lg:shrink-0 lg:border-r`}
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
+            <div>
+              <h2 className="text-lg font-medium text-deep">Conversas</h2>
+              <p className="text-sm text-ink-soft">
+                {listBusy ? "Carregando…" : `${conversations.length} ${conversations.length === 1 ? "conversa" : "conversas"}`}
+              </p>
+            </div>
+            <SmallButton variant="solid" onClick={() => setNewOpen(true)} label="Iniciar nova conversa">
+              <span className="inline-flex items-center gap-1.5">
+                <Icon icon={PlusIcon} size={18} />
+                Nova
+              </span>
+            </SmallButton>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {listBusy ? (
+              <ListSkeleton />
+            ) : conversations.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-8 text-center">
+                <span className="flex size-14 items-center justify-center rounded-full bg-mint-100 text-action">
+                  <Icon icon={MessageIcon} size={28} />
+                </span>
+                <p className="text-base font-medium text-ink">Nenhuma conversa ainda</p>
+                <p className="text-sm text-ink-soft">
+                  {contacts.length > 0
+                    ? "Use “Nova” para começar uma conversa com uma pessoa autorizada."
+                    : isPatient
+                      ? "Para conversar, é preciso ter um cuidador clínico com a comunicação habilitada."
+                      : "Não encontramos um contato com conta associada para iniciar a conversa."}
+                </p>
+                {isPatient && contacts.length === 0 && (
+                  <SmallButton to="/app/rede-de-cuidado">Ir para Minha rede</SmallButton>
+                )}
+              </div>
+            ) : (
+              <ul className="flex flex-col gap-1 p-3">
+                {conversations.map((conversation) => {
+                  const active = conversation._id === selectedConversationId;
+                  const name = conversationName(conversation);
+                  return (
+                    <li key={conversation._id}>
+                      <button
+                        type="button"
+                        aria-current={active ? "true" : undefined}
+                        onClick={() => openConversation(conversation._id)}
+                        className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-action ${
+                          active ? "bg-mint-100" : "hover:bg-mint-100/60"
+                        }`}
+                      >
+                        <Avatar name={name} tone="soft" className="bg-white!" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-base font-medium text-ink">{name}</span>
+                          <span className="block truncate text-sm text-ink-soft">
+                            {otherPerson(conversation)?.role ?? "Conversa"}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-xs text-ink-soft">
+                          {formatShort(conversation.updatedAt ?? conversation.createdAt)}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </aside>
+
+        {/* ----- conversa ----- */}
+        <section
+          aria-label="Conversa aberta"
+          className={`${mobileView === "list" ? "hidden" : "flex"} min-w-0 flex-1 flex-col lg:flex`}
+        >
+          {!selectedConversation ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+              <span className="flex size-16 items-center justify-center rounded-full bg-mint-100 text-action">
+                <Icon icon={MessageIcon} size={32} />
+              </span>
+              <p className="text-lg font-medium text-deep">Suas mensagens aparecem aqui</p>
+              <p className="max-w-sm text-sm text-ink-soft">
+                Escolha uma conversa na lista ou inicie uma nova com uma pessoa autorizada.
               </p>
             </div>
           ) : (
             <>
-              <div
-                aria-live="polite"
-                className="flex min-h-64 max-h-[55vh] flex-col gap-3 overflow-y-auto rounded-2xl bg-white/45 p-3 sm:p-5"
-              >
-                {loadingMessages ? (
-                  <p className="m-auto text-sm text-ink-soft">
-                    Carregando mensagens...
+              <header className="flex items-center gap-3 border-b border-line px-4 py-3 sm:px-5">
+                <button
+                  type="button"
+                  onClick={() => setMobileView("list")}
+                  aria-label="Voltar para a lista de conversas"
+                  className="flex size-11 shrink-0 items-center justify-center rounded-full text-action hover:bg-mint-100 focus-visible:outline-2 focus-visible:outline-action lg:hidden"
+                >
+                  <Icon icon={ChevronLeftIcon} size={22} />
+                </button>
+                <Avatar name={conversationName(selectedConversation)} tone="soft" />
+                <div className="min-w-0">
+                  <h2 className="truncate text-lg font-medium text-deep">
+                    {conversationName(selectedConversation)}
+                  </h2>
+                  <p className="truncate text-sm text-ink-soft">
+                    {otherPerson(selectedConversation)?.role ?? "Conversa"}
                   </p>
-                ) : messages.length === 0 ? (
-                  <p className="m-auto text-center text-sm text-ink-soft">
-                    Esta conversa ainda não possui mensagens. Você pode enviar
-                    a primeira.
-                  </p>
-                ) : (
-                  messages.map((message) => {
-                    const isMine =
-                      Boolean(session.userId) &&
-                      message.data.senderId === session.userId;
+                </div>
+              </header>
 
-                    return (
-                      <div
-                        key={message._id}
-                        className={`max-w-[90%] rounded-2xl px-4 py-3 sm:max-w-[80%] ${
-                          isMine
-                            ? "self-end rounded-br-md bg-action text-white"
-                            : "self-start rounded-bl-md border border-line bg-white text-ink"
-                        }`}
-                      >
-                        <p className="whitespace-pre-wrap break-words text-sm leading-6">
-                          {message.data.text}
-                        </p>
-                        <p
-                          className={`mt-2 text-right text-[11px] ${
-                            isMine ? "text-white/75" : "text-ink-soft"
+              <div className="relative min-h-0 flex-1">
+                <div
+                  ref={scrollRef}
+                  onScroll={handleScroll}
+                  role="log"
+                  aria-live="polite"
+                  aria-relevant="additions"
+                  aria-label="Mensagens"
+                  className="flex h-full flex-col overflow-y-auto px-4 py-4 sm:px-6"
+                >
+                  {loadingMessages ? (
+                    <ThreadSkeleton />
+                  ) : threadError ? (
+                    <div className="m-auto flex flex-col items-center gap-3 text-center">
+                      <p role="alert" className="max-w-sm text-sm text-alert-text">
+                        {threadError}
+                      </p>
+                      <SmallButton onClick={() => setReloadKey((value) => value + 1)}>
+                        Tentar novamente
+                      </SmallButton>
+                    </div>
+                  ) : rows.length === 0 ? (
+                    <div className="m-auto max-w-xs text-center">
+                      <p className="text-base font-medium text-ink">Nenhuma mensagem ainda</p>
+                      <p className="mt-1 text-sm text-ink-soft">
+                        Envie a primeira mensagem para começar a conversa.
+                      </p>
+                    </div>
+                  ) : (
+                    rows.map((row) =>
+                      row.kind === "day" ? (
+                        <div key={row.key} className="my-4 flex justify-center">
+                          <span className="rounded-full bg-mint-100 px-3 py-1 text-xs font-medium text-action-hover">
+                            {row.label}
+                          </span>
+                        </div>
+                      ) : (
+                        <div
+                          key={row.key}
+                          className={`flex flex-col ${row.mine ? "items-end" : "items-start"} ${
+                            row.first ? "mt-3" : "mt-1"
                           }`}
                         >
-                          {formatDate(
-                            message.data.sentAt ?? message.createdAt,
-                          )}
-                        </p>
-                      </div>
-                    );
-                  })
+                          <div
+                            className={`max-w-[88%] rounded-2xl px-4 py-2.5 sm:max-w-[75%] ${
+                              row.mine
+                                ? "rounded-br-md bg-action text-white"
+                                : "rounded-bl-md border border-line bg-white text-ink"
+                            }`}
+                          >
+                            <p className="whitespace-pre-wrap break-words text-base leading-6">
+                              {row.message.data.text}
+                            </p>
+                            <p
+                              className={`mt-1 text-right text-xs ${
+                                row.mine ? "text-white/80" : "text-ink-soft"
+                              }`}
+                            >
+                              {row.time}
+                            </p>
+                          </div>
+                        </div>
+                      ),
+                    )
+                  )}
+                </div>
+
+                {hasNew && (
+                  <button
+                    type="button"
+                    onClick={jumpToLatest}
+                    className="absolute bottom-3 left-1/2 inline-flex min-h-11 -translate-x-1/2 items-center rounded-full bg-action px-5 text-sm font-medium text-white shadow-[0_8px_20px_rgba(36,116,119,0.3)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+                  >
+                    Nova mensagem ↓
+                  </button>
                 )}
               </div>
 
               <form
-                className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
+                className="border-t border-line px-4 py-3 sm:px-5"
                 onSubmit={(event) => {
                   event.preventDefault();
                   void handleSendMessage();
                 }}
               >
-                <label htmlFor="message-draft" className="sr-only">
-                  Escreva sua mensagem
-                </label>
-                <textarea
-                  id="message-draft"
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  maxLength={5000}
-                  rows={2}
-                  placeholder="Escreva sua mensagem..."
-                  className="min-h-12 flex-1 resize-y rounded-2xl border border-field-border bg-white px-4 py-3 text-sm text-ink outline-none placeholder:text-placeholder focus:border-action"
-                />
-                <button
-                  type="submit"
-                  disabled={sending || !draft.trim()}
-                  className="min-h-12 rounded-full bg-action px-6 text-sm font-medium text-white transition hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {sending ? "Enviando..." : "Enviar"}
-                </button>
+                {sendError && (
+                  <p role="alert" className="mb-2 rounded-2xl bg-alert-bg px-3 py-2 text-sm text-alert-text">
+                    {sendError}
+                  </p>
+                )}
+                <div className="flex items-end gap-3">
+                  <label htmlFor="message-draft" className="sr-only">
+                    Escreva sua mensagem
+                  </label>
+                  <textarea
+                    id="message-draft"
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                        event.preventDefault();
+                        void handleSendMessage();
+                      }
+                    }}
+                    maxLength={5000}
+                    rows={2}
+                    placeholder="Escreva sua mensagem"
+                    className="min-h-12 flex-1 resize-none rounded-3xl border border-brand bg-white/70 px-5 py-3 text-sm text-ink placeholder:text-placeholder focus:border-action focus:outline-none focus:ring-4 focus:ring-action/15"
+                  />
+                  <button
+                    type="submit"
+                    disabled={sending || !draft.trim()}
+                    className="inline-flex h-12 shrink-0 items-center rounded-full bg-action px-6 text-sm font-medium text-white transition-colors hover:bg-action-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {sending ? "Enviando…" : "Enviar"}
+                  </button>
+                </div>
+                <div className="mt-1.5 flex items-center justify-between gap-3 text-xs text-ink-soft">
+                  <span>Enter envia · Shift+Enter quebra a linha</span>
+                  <span className={nearLimit ? "font-medium text-alert-text" : ""}>{draft.length}/5000</span>
+                </div>
               </form>
-              <p className="mt-2 text-right text-xs text-ink-soft">
-                {draft.length}/5000 caracteres
-              </p>
             </>
           )}
-        </GlassCard>
+        </section>
       </div>
-    </main>
+
+      <Modal open={newOpen} title="Nova conversa" onClose={() => setNewOpen(false)}>
+        {contacts.length === 0 ? (
+          <div>
+            <EmptyState
+              title="Nenhum contato disponível"
+              description={
+                isPatient
+                  ? "Só é possível conversar com cuidadores clínicos que tenham vínculo ativo e a comunicação habilitada."
+                  : "Não encontramos uma conta associada a este paciente para iniciar a conversa."
+              }
+            />
+            {isPatient && (
+              <div className="mt-4 flex justify-center">
+                <SmallButton to="/app/rede-de-cuidado">Ir para Minha rede</SmallButton>
+              </div>
+            )}
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {contacts.map((contact) => {
+              const existing = conversations.some((item) => participantIds(item).includes(contact.id));
+              return (
+                <li key={contact.id}>
+                  <button
+                    type="button"
+                    disabled={Boolean(creatingId)}
+                    onClick={() => void handleOpenContact(contact)}
+                    className="flex w-full items-center gap-3 rounded-2xl bg-mint-100/70 px-4 py-3 text-left transition-colors hover:bg-mint-100 focus-visible:outline-2 focus-visible:outline-action disabled:opacity-60"
+                  >
+                    <Avatar name={contact.name} tone="soft" className="bg-white!" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-base font-medium text-ink">{contact.name}</span>
+                      <span className="block truncate text-sm text-ink-soft">{contact.role ?? "Contato"}</span>
+                    </span>
+                    <span className="shrink-0 text-sm font-medium text-action">
+                      {creatingId === contact.id ? "Criando…" : existing ? "Abrir conversa" : "Iniciar"}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Modal>
+    </div>
   );
 }

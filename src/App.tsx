@@ -22,6 +22,7 @@ import LandingPage from "./pages/landing/LandingPage";
 import { useSession } from "./modules/session/session";
 import MessagesPage from "./pages/app/MessagesPage";
 import MonitoringPage from "./pages/app/MonitoringPage";
+import CareNetworkPage from "./pages/app/CareNetworkPage";
 
 function AgendaRoute() {
   const { session } = useSession();
@@ -59,6 +60,7 @@ function App() {
             <Route path="configuracoes" element={<SettingsPage />} />
             <Route path="mensagens" element={<MessagesPage />} />
             <Route path="monitoramento" element={<MonitoringPage />} />
+            <Route path="rede-de-cuidado" element={<CareNetworkPage />} />
             <Route path=":section" element={<UnderConstructionPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

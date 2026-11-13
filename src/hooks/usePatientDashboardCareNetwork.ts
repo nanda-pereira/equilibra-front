@@ -11,6 +11,7 @@ import {
   searchCareUser,
   inviteCaregiver,
   enableCaregiverCommunication,
+  revokeCaregiverAccess
 } from "../services/api/patients";
 import type {
   PatientCareLink,
@@ -94,6 +95,9 @@ export default function usePatientDashboardCareNetwork(
   const [enablingCommunicationId, setEnablingCommunicationId] =
   useState<string | null>(null);
 
+  const [removingCaregiverId, setRemovingCaregiverId] =
+    useState<string | null>(null);
+  
   const loadCareNetwork = useCallback(async () => {
     if (!accessToken) {
       setLinks([]);
@@ -109,14 +113,16 @@ export default function usePatientDashboardCareNetwork(
       const result = await getMyPatientCareNetwork(accessToken);
       setLinks(result);
     } catch (err) {
-      setLinks([]);
       setError(
         err instanceof Error
           ? err.message
           : "Não foi possível carregar sua rede de cuidado.",
       );
+    } finally {
+      setLoading(false);
     }
   }, [accessToken]);
+
 
   useEffect(() => {
     let active = true;
@@ -320,6 +326,42 @@ export default function usePatientDashboardCareNetwork(
     }
   }
 
+  async function handleRevokeCaregiver(linkId: string) {
+    if (!accessToken) {
+      setFeedback({
+        type: "error",
+        message: "Sua sessão expirou. Entre novamente para continuar.",
+      });
+      return false;
+    }
+
+    setRemovingCaregiverId(linkId);
+    setFeedback(null);
+
+    try {
+      await revokeCaregiverAccess(accessToken, linkId);
+
+      setFeedback({
+        type: "success",
+        message: "Cuidador removido da sua rede de cuidado.",
+      });
+
+      await loadCareNetwork();
+      return true;
+    } catch (err) {
+      setFeedback({
+        type: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Não foi possível remover o cuidador.",
+      });
+      return false;
+    } finally {
+      setRemovingCaregiverId(null);
+    }
+  }
+
   const activePeople = useMemo(
     () =>
       links
@@ -358,5 +400,7 @@ export default function usePatientDashboardCareNetwork(
     handleInvite,
     enablingCommunicationId,
     handleEnableCommunication,
+    removingCaregiverId,
+    handleRevokeCaregiver,
   };
 }
