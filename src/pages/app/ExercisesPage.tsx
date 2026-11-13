@@ -3,7 +3,6 @@ import EmptyState from "../../components/app/EmptyState";
 import GlassCard from "../../components/app/GlassCard";
 import ListRow from "../../components/app/ListRow";
 import PageHeader from "../../components/app/PageHeader";
-import ProgressRing from "../../components/app/ProgressRing";
 import StatusBadge from "../../components/app/StatusBadge";
 import StretchDialog from "../../components/app/StretchDialog";
 import StretchIllustration from "../../components/app/StretchIllustration";
@@ -11,6 +10,7 @@ import { ExerciseIcon } from "../../components/ui/icons";
 import { DISCLAIMER, STRETCHES, type Stretch } from "../../modules/demo/stretches";
 import { useSession } from "../../modules/session/session";
 import usePatientExercisesData from "../../hooks/usePatientExercisesData";
+import ProgressRing from "../../components/app/ProgressRing";
 
 function formatDuration(minutes?: number) {
   if (!minutes || minutes <= 0) return "Duração não informada";
@@ -179,6 +179,7 @@ export default function ExercisesPage() {
           )}
         </GlassCard>
 
+
         <GlassCard title="Progresso da semana">
           {loading ? (
             <p className="text-sm text-ink-soft">
@@ -192,13 +193,19 @@ export default function ExercisesPage() {
             <div className="flex flex-col items-center gap-3 text-center">
               <ProgressRing
                 value={completedLogs.length}
-                max={Math.max(exercises.length, completedLogs.length, 1)}
-                label="Registros de exercícios concluídos nesta semana"
+                label="Exercícios concluídos nesta semana"
               />
-              <p className="text-sm text-ink-soft">
+
+              <p className="text-sm font-medium text-deep">
                 {completedLogs.length === 1
-                  ? "1 exercício registrado como concluído nesta semana."
-                  : `${completedLogs.length} exercícios registrados como concluídos nesta semana.`}
+                  ? "1 exercício concluído nesta semana"
+                  : `${completedLogs.length} exercícios concluídos nesta semana`}
+              </p>
+
+              <p className="max-w-xs text-sm text-ink-soft">
+                {completedLogs.length === 0
+                  ? "Seus exercícios concluídos aparecerão aqui ao longo da semana."
+                  : "Este total considera os registros marcados como concluídos nesta semana."}
               </p>
             </div>
           )}

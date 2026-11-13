@@ -378,12 +378,14 @@ export async function inviteCaregiver(
           "patient.events.read",
           "patient.medications.read",
           "patient.appointments.read",
+          "patient.exercises.read",
         ]
       : [
           "patient.profile.read",
           "patient.events.read",
           "patient.medications.read",
           "patient.appointments.read",
+          "patient.exercises.read",
         ];
 
   return mutate<PatientCareLink>(
