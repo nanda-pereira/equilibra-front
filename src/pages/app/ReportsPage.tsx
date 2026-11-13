@@ -1,4 +1,5 @@
-
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router";
 import EmptyState from "../../components/app/EmptyState";
@@ -340,7 +341,14 @@ export default function ReportsPage() {
 
     const exportTime = Date.now();
 
-    downloadCsv(`relatorio-${selectedPatient.id}.csv`, [
+    downloadCsv(
+      `relatorio-${selectedPatient.name
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .toLowerCase()}.csv`,
+      [
       ["Relatório do Equilibra", selectedPatient.name, period.label],
       [],
       ["Consultas", "Data e horário", "Título", "Situação", "Observações"],
@@ -391,18 +399,190 @@ export default function ReportsPage() {
     ]);
   }
 
+    function exportPdf() {
+    if (!selectedPatient) return;
+
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const exportTime = Date.now();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(19);
+    doc.setTextColor(18, 63, 66);
+    doc.text("Relatório do Equilibra", 14, 18);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(40, 43, 45);
+    doc.text(`Paciente: ${selectedPatient.name}`, 14, 27);
+    doc.text(`Período: ${period.label}`, 14, 33);
+    doc.text(
+      `Gerado em: ${new Date().toLocaleString("pt-BR")}`,
+      pageWidth - 14,
+      27,
+      { align: "right" },
+    );
+
+    let currentY = 42;
+
+    function addSection(
+      title: string,
+      headers: string[],
+      rows: string[][],
+    ) {
+      // Evita deixar o título isolado no final de uma página.
+      if (currentY > 175) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(18, 63, 66);
+      doc.text(title, 14, currentY);
+
+      autoTable(doc, {
+        startY: currentY + 4,
+        head: [headers],
+        body: rows.length > 0 ? rows : [["Nenhum registro no período", ...headers.slice(1).map(() => "")]],
+        theme: "grid",
+        margin: { left: 14, right: 14, bottom: 18 },
+        styles: {
+          font: "helvetica",
+          fontSize: 8,
+          cellPadding: 3,
+          textColor: [40, 43, 45],
+          lineColor: [220, 232, 230],
+          lineWidth: 0.2,
+          overflow: "linebreak",
+        },
+        headStyles: {
+          fillColor: [36, 116, 119],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        alternateRowStyles: {
+          fillColor: [244, 249, 248],
+        },
+      });
+
+      const tableDocument = doc as jsPDF & {
+        lastAutoTable?: { finalY: number };
+      };
+
+      currentY = (tableDocument.lastAutoTable?.finalY ?? currentY) + 12;
+    }
+
+    const appointmentRows = filteredAppointments.map((item) => {
+      const scheduledAt = item.data.scheduledAt;
+      const date = scheduledAt
+        ? new Date(scheduledAt)
+        : getRecordDate(item);
+
+      const status = date
+        ? date.getTime() < exportTime
+          ? "Já ocorreu"
+          : "Agendada"
+        : item.status;
+
+      return [
+        scheduledAt
+          ? formatDateTime(scheduledAt)
+          : date
+            ? formatDate(date.toISOString())
+            : "Data não informada",
+        item.data.title ?? "Consulta",
+        status,
+        item.data.notes ?? "—",
+      ];
+    });
+
+    addSection(
+      "Consultas",
+      ["Data e horário", "Título", "Situação", "Observações"],
+      appointmentRows,
+    );
+
+    const observationRows = filteredObservations.map((item) => [
+      formatDate(getRecordDate(item)?.toISOString()),
+      item.data.category ?? "Não informada",
+      item.data.notes ?? "—",
+    ]);
+
+    addSection(
+      "Registros de evolução",
+      ["Data", "Categoria", "Observação"],
+      observationRows,
+    );
+
+    const medicationRows = (medications?.prescriptions ?? []).map((item) => [
+      medications?.medications.find(
+        (medication) => medication._id === item.data.medicationId,
+      )?.data.name ?? "Medicamento",
+      `${item.data.dose} ${item.data.unit}`,
+      item.data.route ?? "Não informada",
+      item.data.instructions ?? "—",
+    ]);
+
+    addSection(
+      "Medicamentos prescritos",
+      ["Medicamento", "Dose", "Via", "Instruções"],
+      medicationRows,
+    );
+
+    addSection(
+      "Registros de medicação no período",
+      ["Descrição", "Quantidade"],
+      [["Registros encontrados", String(medicationLogs.length)]],
+    );
+
+    // Numera todas as páginas, inclusive as criadas automaticamente pelas tabelas.
+    const totalPages = doc.getNumberOfPages();
+
+    for (let page = 1; page <= totalPages; page++) {
+      doc.setPage(page);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(88, 100, 99);
+      doc.text(
+        `Equilibra • Documento confidencial • Página ${page} de ${totalPages}`,
+        pageWidth / 2,
+        doc.internal.pageSize.getHeight() - 8,
+        { align: "center" },
+      );
+    }
+
+    doc.save(
+    `relatorio-${selectedPatient.name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .toLowerCase()}.pdf`,
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Relatórios"
         subtitle="Resumo por paciente e período"
       >
+      <div className="flex flex-wrap gap-2">
         <SmallButton onClick={exportCsv}>
           <span className="inline-flex items-center gap-2">
             <Icon icon={DownloadIcon} size={18} />
             Exportar CSV
           </span>
         </SmallButton>
+
+        <SmallButton onClick={exportPdf}>
+          <span className="inline-flex items-center gap-2">
+            <Icon icon={DownloadIcon} size={18} />
+            Exportar PDF
+          </span>
+        </SmallButton>
+      </div>
       </PageHeader>
 
       <GlassCard title="Filtros">
@@ -547,8 +727,7 @@ export default function ReportsPage() {
       )}
 
       <p className="text-sm text-ink-soft">
-        Os dados exibidos dependem dos registros disponíveis na API. A
-        exportação em PDF ainda não está disponível.
+        Os dados exibidos dependem dos registros disponíveis.
       </p>
     </div>
   );
