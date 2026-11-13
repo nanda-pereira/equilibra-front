@@ -378,6 +378,8 @@ export async function inviteCaregiver(
           "patient.events.read",
           "patient.medications.read",
           "patient.appointments.read",
+          "patient.communication.read",
+          "patient.communication.send",
         ]
       : [
           "patient.profile.read",
@@ -408,6 +410,17 @@ export async function respondToCareInvite(
 
   return mutate<PatientCareLink>(
     `/patient-links/${encodeURIComponent(linkId)}/${action}`,
+    accessToken,
+    "PATCH",
+  );
+}
+
+export async function enableCaregiverCommunication(
+  accessToken: string,
+  linkId: string,
+): Promise<PatientCareLink> {
+  return mutate<PatientCareLink>(
+    `/patient-links/${encodeURIComponent(linkId)}/enable-communication`,
     accessToken,
     "PATCH",
   );

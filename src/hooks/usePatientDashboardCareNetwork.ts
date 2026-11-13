@@ -10,6 +10,7 @@ import {
   getMyPatientProfileId,
   searchCareUser,
   inviteCaregiver,
+  enableCaregiverCommunication,
 } from "../services/api/patients";
 import type {
   PatientCareLink,
@@ -22,9 +23,12 @@ export type CaregiverRole =
 
 type CarePerson = {
   id: string;
+  linkId: string;
+  relationship: string;
   name: string;
   role: string;
   status: string;
+  permissions?: string[];
 };
 
 type Feedback = {
@@ -56,11 +60,14 @@ function toCarePerson(link: PatientCareLink): CarePerson | null {
 
   return {
     id: user._id ?? link._id,
+    linkId: link._id,
+    relationship: link.relationship,
     name,
     role:
       relationshipLabels[link.relationship] ??
       "Membro da equipe de cuidado",
     status: link.status,
+    permissions: link.permissions,
   };
 }
 
@@ -83,6 +90,9 @@ export default function usePatientDashboardCareNetwork(
   const [searching, setSearching] = useState(false);
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
+
+  const [enablingCommunicationId, setEnablingCommunicationId] =
+  useState<string | null>(null);
 
   const loadCareNetwork = useCallback(async () => {
     if (!accessToken) {
@@ -276,6 +286,40 @@ export default function usePatientDashboardCareNetwork(
     }
   }
 
+  async function handleEnableCommunication(linkId: string) {
+    if (!accessToken) {
+      setFeedback({
+        type: "error",
+        message: "Sua sessão expirou. Entre novamente para continuar.",
+      });
+      return;
+    }
+
+    setEnablingCommunicationId(linkId);
+    setFeedback(null);
+
+    try {
+      await enableCaregiverCommunication(accessToken, linkId);
+
+      setFeedback({
+        type: "success",
+        message: "Comunicação habilitada para o cuidador clínico.",
+      });
+
+      await loadCareNetwork();
+    } catch (err) {
+      setFeedback({
+        type: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Não foi possível habilitar a comunicação.",
+      });
+    } finally {
+      setEnablingCommunicationId(null);
+    }
+  }
+
   const activePeople = useMemo(
     () =>
       links
@@ -312,5 +356,7 @@ export default function usePatientDashboardCareNetwork(
     loadCareNetwork,
     handleSearch,
     handleInvite,
+    enablingCommunicationId,
+    handleEnableCommunication,
   };
 }

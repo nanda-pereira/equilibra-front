@@ -31,6 +31,8 @@ export default function PatientDashboardCareNetwork({
     loadCareNetwork,
     handleSearch,
     handleInvite,
+    enablingCommunicationId,
+    handleEnableCommunication,
   } = usePatientDashboardCareNetwork(accessToken, userId);
 
   return (
@@ -243,7 +245,7 @@ export default function PatientDashboardCareNetwork({
                   tone="soft"
                   className="bg-white!"
                 />
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-base font-medium text-ink">
                     {person.name}
                   </p>
@@ -252,6 +254,34 @@ export default function PatientDashboardCareNetwork({
                     {statusLabels[person.status]}
                   </p>
                 </div>
+
+                {person.relationship === "CLINICAL_CAREGIVER" && (
+                  person.permissions?.includes(
+                    "patient.communication.read",
+                  ) &&
+                  person.permissions?.includes(
+                    "patient.communication.send",
+                  ) ? (
+                    <span className="shrink-0 text-xs font-medium text-emerald-700">
+                      Comunicação habilitada
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void handleEnableCommunication(person.linkId)
+                      }
+                      disabled={
+                        enablingCommunicationId === person.linkId
+                      }
+                      className="shrink-0 rounded-full border border-action px-3 py-2 text-xs font-medium text-action transition hover:bg-mint-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {enablingCommunicationId === person.linkId
+                        ? "Habilitando..."
+                        : "Habilitar comunicação"}
+                    </button>
+                  )
+                )}
               </li>
             ))}
           </ul>
