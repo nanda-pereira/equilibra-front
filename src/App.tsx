@@ -23,6 +23,7 @@ import { useSession } from "./modules/session/session";
 import MessagesPage from "./pages/app/MessagesPage";
 import MonitoringPage from "./pages/app/MonitoringPage";
 import CareNetworkPage from "./pages/app/CareNetworkPage";
+import AdminPage from "./pages/admin/AdminPage";
 
 function AgendaRoute() {
   const { session } = useSession();
@@ -38,6 +39,7 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/cadastro" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/admin" element={<AdminPage />} />
           <Route
             path="/app"
             element={

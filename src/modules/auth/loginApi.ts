@@ -1,11 +1,10 @@
-
 import { ApiError } from "./authApi";
-import type { Session } from "../session/session";
-import type { ProfileType } from "./types";
+import type { Session, SessionProfile } from "../session/session";
 
 const API_URL: string | undefined = import.meta.env.VITE_API_URL;
 
 type BackendRole =
+  | "ADMIN"
   | "PATIENT"
   | "PROFESSIONAL"
   | "NEUROLOGIST"
@@ -30,8 +29,9 @@ type LoginResponse = {
   };
 };
 
-function mapBackendRole(role: BackendRole): ProfileType {
-  const profiles: Record<BackendRole, ProfileType> = {
+function mapBackendRole(role: BackendRole): SessionProfile {
+  const profiles: Record<BackendRole, SessionProfile> = {
+    ADMIN: "admin",
     PATIENT: "paciente",
     PROFESSIONAL: "medico",
     NEUROLOGIST: "medico",

@@ -40,7 +40,12 @@ export default function LoginPage() {
   const [verificationDone, setVerificationDone] = useState(false);
 
   if (session) {
-    return <Navigate to="/app" replace />;
+    return (
+      <Navigate
+        to={session.profile === "admin" ? "/admin" : "/app"}
+        replace
+      />
+    );
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

@@ -5,6 +5,7 @@ import ClinicalCaregiverDashboard from "./dashboards/ClinicalCaregiverDashboard"
 import DoctorDashboard from "./dashboards/DoctorDashboard";
 import HomeCaregiverDashboard from "./dashboards/HomeCaregiverDashboard";
 import PatientDashboard from "./dashboards/PatientDashboard";
+import { Navigate } from "react-router";
 
 const DASHBOARDS: Record<ProfileType, ComponentType> = {
   paciente: PatientDashboard,
@@ -16,6 +17,10 @@ const DASHBOARDS: Record<ProfileType, ComponentType> = {
 export default function DashboardPage() {
   const { session } = useSession();
   if (!session) return null;
+
+  if (session.profile === "admin") {
+    return <Navigate to="/admin" replace />;
+  }
 
   const Dashboard = DASHBOARDS[session.profile];
   return <Dashboard />;

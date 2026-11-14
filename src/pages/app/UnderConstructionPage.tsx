@@ -1,4 +1,4 @@
-import { useParams } from "react-router";
+import { Navigate, useParams } from "react-router";
 import EmptyState from "../../components/app/EmptyState";
 import GlassCard from "../../components/app/GlassCard";
 import PageHeader from "../../components/app/PageHeader";
@@ -8,7 +8,12 @@ import { useSession } from "../../modules/session/session";
 export default function UnderConstructionPage() {
   const { section = "" } = useParams();
   const { session } = useSession();
+
   if (!session) return null;
+
+  if (session.profile === "admin") {
+    return <Navigate to="/admin" replace />;
+  }
 
   return (
     <div className="flex flex-col gap-6">

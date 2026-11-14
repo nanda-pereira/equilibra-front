@@ -1,6 +1,5 @@
-
 import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router";
+import { Link, Navigate, NavLink, Outlet, useNavigate } from "react-router";
 import logo from "../../assets/pedras-logo.svg";
 import { NAV_BY_PROFILE, type NavItem } from "../../modules/app/navigation";
 import { useSession } from "../../modules/session/session";
@@ -111,6 +110,10 @@ export default function AppLayout() {
   }, [menuOpen]);
 
   if (!session) return null;
+
+  if (session.profile === "admin") {
+    return <Navigate to="/admin" replace />;
+  }
 
   const nav = NAV_BY_PROFILE[session.profile];
 

@@ -232,7 +232,11 @@ export default function ProfilePage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Meu perfil"
-        subtitle={PROFILE_LABELS[session.profile]}
+        subtitle={
+          session.profile === "admin"
+            ? "Administrador"
+            : PROFILE_LABELS[session.profile]
+        }
       >
         {!editing && user && (
           <SmallButton onClick={startEditing}>
@@ -360,7 +364,9 @@ export default function ProfilePage() {
                 </Info>
 
                 <Info label="Perfil">
-                  {PROFILE_LABELS[session.profile]}
+                  {session.profile === "admin"
+                    ? "Administrador"
+                    : PROFILE_LABELS[session.profile]}
                 </Info>
 
                 <Info label="E-mail">

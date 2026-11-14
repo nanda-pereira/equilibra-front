@@ -59,6 +59,16 @@ export function buildRegisterPayload(
     email: data.email.trim().toLowerCase(),
     password: data.password,
     role: ROLE_MAP[profile],
+    ...(profile === "medico"
+      ? {
+          crm: data.crm.trim(),
+          specialty: data.specialty.trim(),
+        }
+      : profile === "cuidador-clinico"
+        ? {
+            specialty: data.specialty.trim(),
+          }
+        : {}),
   };
 }
 
@@ -113,7 +123,6 @@ export async function registerUser(
 
   return result.data;
 }
-
 
 export async function verifyEmail(token: string): Promise<void> {
   if (!API_URL) {

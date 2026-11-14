@@ -453,7 +453,11 @@ export default function SettingsPage() {
 
       <GlassCard title="Conta">
         <p className="text-base text-ink">
-          {session.name} · {PROFILE_LABELS[session.profile]}
+          {session.name} · {
+            session.profile === "admin"
+              ? "Administrador"
+              : PROFILE_LABELS[session.profile]
+          }
         </p>
 
         <div className="mt-4 flex flex-wrap gap-3">

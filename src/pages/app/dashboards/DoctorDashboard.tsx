@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import Avatar from "../../../components/app/Avatar";
 import EmptyState from "../../../components/app/EmptyState";
@@ -18,11 +18,14 @@ import {
 import { useSession } from "../../../modules/session/session";
 import {
   getAccessiblePatients,
+  getMyPatientCareNetwork,
   getPatientAppointments,
   getPatientMedications,
   getPatientObservations,
+  respondToCareInvite,
   type ObservationData,
   type PatientAppointment,
+  type PatientCareLink,
   type PatientMedicationsData,
   type PatientProfile,
   type PatientRecord,
@@ -46,6 +49,38 @@ function getPatientName(patient: PatientProfile): string {
   }
 
   return "Paciente";
+}
+
+function getInviteId(invite: PatientCareLink): string {
+  return invite._id;
+}
+
+function getInvitePatientName(invite: PatientCareLink): string {
+  const patient = invite.patientId;
+
+  if (patient && typeof patient === "object") {
+    const patientUser = patient.userId;
+
+    if (patientUser && typeof patientUser === "object") {
+      return patientUser.fullName || "Paciente";
+    }
+  }
+
+  return "Paciente";
+}
+
+function getInvitePatientEmail(invite: PatientCareLink): string {
+  const patient = invite.patientId;
+
+  if (patient && typeof patient === "object") {
+    const patientUser = patient.userId;
+
+    if (patientUser && typeof patientUser === "object") {
+      return patientUser.email || "";
+    }
+  }
+
+  return "";
 }
 
 function getAppointmentDate(
@@ -128,8 +163,130 @@ export default function DoctorDashboard() {
   const accessToken = session?.accessToken;
 
   const [patients, setPatients] = useState<DashboardPatient[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<PatientCareLink[]>([]);
   const [loading, setLoading] = useState(true);
+  const [invitesLoading, setInvitesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+  const [inviteActionId, setInviteActionId] = useState<string | null>(null);
+
+  const loadInvites = useCallback(async () => {
+    if (!accessToken) {
+      setPendingInvites([]);
+      setInvitesLoading(false);
+      return;
+    }
+
+    setInvitesLoading(true);
+    setInviteError(null);
+
+    try {
+      const links = await getMyPatientCareNetwork(accessToken);
+
+      setPendingInvites(
+        links.filter(
+          (link) =>
+            link.status === "PENDING" &&
+            ["NEUROLOGIST", "PROFESSIONAL"].includes(
+              link.relationship.toUpperCase(),
+            ),
+        ),
+      );
+    } catch (loadError) {
+      setInviteError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Não foi possível carregar as solicitações de vínculo.",
+      );
+    } finally {
+      setInvitesLoading(false);
+    }
+  }, [accessToken]);
+
+  const handleInviteResponse = async (
+    invite: PatientCareLink,
+    status: "ACTIVE" | "REJECTED",
+  ) => {
+    const inviteId = getInviteId(invite);
+
+    if (!accessToken || !inviteId || inviteActionId) return;
+
+    setInviteActionId(inviteId);
+    setInviteError(null);
+    setInviteSuccess(null);
+
+    try {
+      await respondToCareInvite(inviteId, status, accessToken);
+
+      setPendingInvites((current) =>
+        current.filter((item) => getInviteId(item) !== inviteId),
+      );
+
+      setInviteSuccess(
+        status === "ACTIVE"
+          ? `Solicitação de ${getInvitePatientName(invite)} aceita.`
+          : `Solicitação de ${getInvitePatientName(invite)} recusada.`,
+      );
+
+      if (status === "ACTIVE") {
+        try {
+          const profiles = await getAccessiblePatients(accessToken);
+
+          const results = await Promise.all(
+            profiles.map(async (profile) => {
+              const id = getPatientId(profile);
+
+              if (!id) return null;
+
+              const [appointments, medications, observations] =
+                await Promise.allSettled([
+                  getPatientAppointments(accessToken, id),
+                  getPatientMedications(accessToken, id),
+                  getPatientObservations(accessToken, id),
+                ]);
+
+              return {
+                id,
+                name: getPatientName(profile),
+                appointments:
+                  appointments.status === "fulfilled"
+                    ? appointments.value
+                    : [],
+                medications:
+                  medications.status === "fulfilled"
+                    ? medications.value.medications
+                    : [],
+                observations:
+                  observations.status === "fulfilled"
+                    ? observations.value
+                    : [],
+              } satisfies DashboardPatient;
+            }),
+          );
+
+          setPatients(
+            results.filter(
+              (patient): patient is DashboardPatient => patient !== null,
+            ),
+          );
+        } catch {
+          // A resposta ao convite foi concluída; a lista será atualizada
+          // novamente quando o dashboard for recarregado.
+        }
+      }
+    } catch (actionError) {
+      setInviteError(
+        actionError instanceof Error
+          ? actionError.message
+          : "Não foi possível responder à solicitação.",
+      );
+
+      await loadInvites();
+    } finally {
+      setInviteActionId(null);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -137,7 +294,9 @@ export default function DoctorDashboard() {
     async function loadDashboard() {
       if (!accessToken) {
         setPatients([]);
+        setPendingInvites([]);
         setLoading(false);
+        setInvitesLoading(false);
         setError(null);
         return;
       }
@@ -146,7 +305,23 @@ export default function DoctorDashboard() {
       setError(null);
 
       try {
-        const profiles = await getAccessiblePatients(accessToken);
+        const [profiles, links] = await Promise.all([
+          getAccessiblePatients(accessToken),
+          getMyPatientCareNetwork(accessToken),
+        ]);
+
+        if (cancelled) return;
+
+        setPendingInvites(
+          links.filter(
+            (link) =>
+              link.status === "PENDING" &&
+              ["NEUROLOGIST", "PROFESSIONAL"].includes(
+                link.relationship.toUpperCase(),
+              ),
+          ),
+        );
+        setInvitesLoading(false);
 
         const results = await Promise.all(
           profiles.map(async (profile) => {
@@ -197,7 +372,10 @@ export default function DoctorDashboard() {
             : "Não foi possível carregar os dados do dashboard.",
         );
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setInvitesLoading(false);
+        }
       }
     }
 
@@ -216,6 +394,7 @@ export default function DoctorDashboard() {
   );
 
   const now = new Date();
+
   const todayAppointments = allAppointments
     .filter(({ appointment }) => {
       const date = getAppointmentDate(appointment);
@@ -288,6 +467,92 @@ export default function DoctorDashboard() {
         </div>
       )}
 
+      <GlassCard title="Solicitações de vínculo">
+        {inviteError && (
+          <div
+            role="alert"
+            className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+          >
+            {inviteError}
+          </div>
+        )}
+
+        {inviteSuccess && (
+          <div
+            role="status"
+            className="mb-4 rounded-2xl border border-line bg-mint-100/70 p-3 text-sm text-ink"
+          >
+            {inviteSuccess}
+          </div>
+        )}
+
+        {invitesLoading ? (
+          <p className="text-sm text-ink-soft">
+            Carregando solicitações...
+          </p>
+        ) : pendingInvites.length === 0 ? (
+          <EmptyState title="Nenhuma solicitação pendente" />
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {pendingInvites.map((invite) => {
+              const patientName = getInvitePatientName(invite);
+              const patientEmail = getInvitePatientEmail(invite);
+              const isProcessing = inviteActionId === getInviteId(invite);
+
+              return (
+                <li
+                  key={getInviteId(invite)}
+                  className="flex flex-col gap-4 rounded-[20px] bg-mint-100/70 p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Avatar
+                      name={patientName}
+                      tone="soft"
+                      className="bg-white!"
+                    />
+                    <div className="min-w-0">
+                      <p className="font-medium text-ink">{patientName}</p>
+                      {patientEmail && (
+                        <p className="break-all text-sm text-ink-soft">
+                          {patientEmail}
+                        </p>
+                      )}
+                      <p className="mt-1 text-sm text-ink-soft">
+                        Solicita vínculo como paciente
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 sm:shrink-0">
+                    <button
+                      type="button"
+                      disabled={Boolean(inviteActionId)}
+                      onClick={() =>
+                        void handleInviteResponse(invite, "REJECTED")
+                      }
+                      className="min-h-11 rounded-full border border-line bg-white px-5 py-2 text-sm font-medium text-ink transition hover:bg-mint-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isProcessing ? "Aguarde..." : "Recusar"}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={Boolean(inviteActionId)}
+                      onClick={() =>
+                        void handleInviteResponse(invite, "ACTIVE")
+                      }
+                      className="min-h-11 rounded-full bg-action px-5 py-2 text-sm font-medium text-white transition hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isProcessing ? "Aguarde..." : "Aceitar"}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </GlassCard>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
         <MetricCard
           icon={PatientsIcon}
@@ -331,13 +596,18 @@ export default function DoctorDashboard() {
                       to={`/app/pacientes/${patient.id}`}
                       className="flex items-center gap-3 rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-action"
                     >
-                      <Avatar name={patient.name} tone="soft" className="bg-white!" />
+                      <Avatar
+                        name={patient.name}
+                        tone="soft"
+                        className="bg-white!"
+                      />
                       <div>
                         <p className="text-base font-medium text-ink">
                           {patient.name}
                         </p>
                         <p className="text-sm text-ink-soft">
-                          {patient.medications.length} medicamento(s) cadastrado(s)
+                          {patient.medications.length} medicamento(s)
+                          cadastrado(s)
                         </p>
                       </div>
                     </Link>
@@ -373,9 +643,15 @@ export default function DoctorDashboard() {
                 </caption>
                 <thead>
                   <tr className="text-sm text-ink-soft">
-                    <th scope="col" className="pb-3 font-medium">Paciente</th>
-                    <th scope="col" className="pb-3 font-medium">Próxima consulta</th>
-                    <th scope="col" className="pb-3 font-medium">Medicamentos cadastrados</th>
+                    <th scope="col" className="pb-3 font-medium">
+                      Paciente
+                    </th>
+                    <th scope="col" className="pb-3 font-medium">
+                      Próxima consulta
+                    </th>
+                    <th scope="col" className="pb-3 font-medium">
+                      Medicamentos cadastrados
+                    </th>
                     <th scope="col" className="pb-3">
                       <span className="sr-only">Ações</span>
                     </th>

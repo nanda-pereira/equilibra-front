@@ -2,8 +2,10 @@
 import { createContext, useContext } from "react";
 import type { ProfileType } from "../auth/types";
 
+export type SessionProfile = ProfileType | "admin";
+
 export type Session = {
-  profile: ProfileType;
+  profile: SessionProfile;
   name: string;
   userId?: string;
   email?: string;
