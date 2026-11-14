@@ -40,11 +40,11 @@ export default function SolutionSection() {
             aria-hidden="true"
             className="absolute left-0 top-[12.94%] h-[87.06%] w-[95.39%] rounded-full bg-[radial-gradient(circle_at_50%_70%,#bfe3df_0%,rgba(191,227,223,0)_70%)]"
           />
-          <img
-            src={senhoraImg}
-            alt="Mulher idosa de perfil, com expressão serena"
-            className="absolute left-[8.25%] top-0 h-[91.89%] w-[91.75%] object-contain"
-          />
+        <img
+          src={senhoraImg}
+          alt="Mulher idosa de perfil, com expressão serena"
+          className="absolute left-[8.25%] top-0 h-[91.89%] w-[91.75%] object-contain [mask-image:linear-gradient(to_bottom,#000_0%,#000_68%,rgba(0,0,0,0.85)_78%,rgba(0,0,0,0.45)_88%,transparent_100%)]"
+        />
         </Reveal>
 
         <Reveal
