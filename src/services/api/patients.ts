@@ -186,7 +186,7 @@ async function mutate<T>(
 
 /**
  * Obtém o ID do usuário associado ao perfil do paciente.
- * O backend pode retornar userId como string ou como objeto populado.
+ * O backend pode retornar userId como string ou objeto populado.
  */
 function getPatientUserId(
   patient: PatientProfile,
@@ -308,20 +308,23 @@ export async function getPatientAppointments(
   );
 }
 
+export type CareNetworkUser = {
+  _id?: string;
+  id?: string;
+  fullName?: string;
+  email?: string;
+  role?: string;
+  specialty?: string | null;
+  crm?: string | null;
+  professionalVerified?: boolean;
+};
+
 export type PatientCareLink = {
   _id: string;
   status: string;
   relationship: string;
   permissions?: string[];
-  userId:
-    | string
-    | {
-        _id?: string;
-        id?: string;
-        fullName?: string;
-        email?: string;
-        role?: string;
-      };
+  userId: string | CareNetworkUser;
   patientId?:
     | string
     | {
@@ -344,6 +347,9 @@ export type CareUser = {
   fullName: string;
   email: string;
   role: string;
+  specialty?: string | null;
+  crm?: string | null;
+  professionalVerified?: boolean;
 };
 
 export async function getMyPatientCareNetwork(
@@ -364,17 +370,21 @@ export async function searchCareUser(
   );
 }
 
+export type CaregiverRelationship =
+  | "PROFESSIONAL"
+  | "CLINICAL_CAREGIVER"
+  | "HOME_CAREGIVER";
+
 export async function inviteCaregiver(
   accessToken: string,
   patientId: string,
   userId: string,
-  relationship: "CLINICAL_CAREGIVER" | "HOME_CAREGIVER",
+  relationship: CaregiverRelationship,
 ): Promise<PatientCareLink> {
   const permissions =
-    relationship === "CLINICAL_CAREGIVER"
+    relationship === "HOME_CAREGIVER"
       ? [
           "patient.profile.read",
-          "patient.monitoring.read",
           "patient.events.read",
           "patient.medications.read",
           "patient.appointments.read",
@@ -382,6 +392,7 @@ export async function inviteCaregiver(
         ]
       : [
           "patient.profile.read",
+          "patient.monitoring.read",
           "patient.events.read",
           "patient.medications.read",
           "patient.appointments.read",

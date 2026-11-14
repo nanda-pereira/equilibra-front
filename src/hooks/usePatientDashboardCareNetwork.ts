@@ -1,3 +1,4 @@
+
 import {
   useCallback,
   useEffect,
@@ -5,20 +6,23 @@ import {
   useState,
   type FormEvent,
 } from "react";
+
 import {
   getMyPatientCareNetwork,
   getMyPatientProfileId,
   searchCareUser,
   inviteCaregiver,
   enableCaregiverCommunication,
-  revokeCaregiverAccess
+  revokeCaregiverAccess,
 } from "../services/api/patients";
+
 import type {
   PatientCareLink,
   CareUser,
 } from "../services/api/patients";
 
 export type CaregiverRole =
+  | "PROFESSIONAL"
   | "CLINICAL_CAREGIVER"
   | "HOME_CAREGIVER";
 
@@ -37,9 +41,15 @@ type Feedback = {
   message: string;
 } | null;
 
+type CareUserWithProfessionalData = CareUser & {
+  specialty?: string | null;
+  crm?: string | null;
+  professionalVerified?: boolean;
+};
+
 export const relationshipLabels: Record<string, string> = {
-  PROFESSIONAL: "Profissional de saúde",
-  NEUROLOGIST: "Neurologista",
+  PROFESSIONAL: "Médico",
+  NEUROLOGIST: "Médico",
   CLINICAL_CAREGIVER: "Cuidador clínico",
   HOME_CAREGIVER: "Cuidador domiciliar",
 };
@@ -48,6 +58,19 @@ export const statusLabels: Record<string, string> = {
   ACTIVE: "Vínculo ativo",
   PENDING: "Convite pendente",
 };
+
+function matchesCaregiverRole(
+  user: CareUserWithProfessionalData,
+  selectedRole: CaregiverRole,
+): boolean {
+  const role = user.role?.toUpperCase();
+
+  if (selectedRole === "PROFESSIONAL") {
+    return role === "PROFESSIONAL" || role === "NEUROLOGIST";
+  }
+
+  return role === selectedRole;
+}
 
 function toCarePerson(link: PatientCareLink): CarePerson | null {
   if (!link.userId || typeof link.userId === "string") {
@@ -85,19 +108,21 @@ export default function usePatientDashboardCareNetwork(
   const [error, setError] = useState<string | null>(null);
 
   const [email, setEmail] = useState("");
+
   const [caregiverRole, setCaregiverRole] =
     useState<CaregiverRole>("CLINICAL_CAREGIVER");
+
   const [foundUser, setFoundUser] = useState<CareUser | null>(null);
   const [searching, setSearching] = useState(false);
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
 
   const [enablingCommunicationId, setEnablingCommunicationId] =
-  useState<string | null>(null);
+    useState<string | null>(null);
 
   const [removingCaregiverId, setRemovingCaregiverId] =
     useState<string | null>(null);
-  
+
   const loadCareNetwork = useCallback(async () => {
     if (!accessToken) {
       setLinks([]);
@@ -122,7 +147,6 @@ export default function usePatientDashboardCareNetwork(
       setLoading(false);
     }
   }, [accessToken]);
-
 
   useEffect(() => {
     let active = true;
@@ -195,7 +219,10 @@ export default function usePatientDashboardCareNetwork(
     setFeedback(null);
 
     try {
-      const user = await searchCareUser(accessToken, normalizedEmail);
+      const user = await searchCareUser(
+        accessToken,
+        normalizedEmail,
+      );
 
       if (!user) {
         setFeedback({
@@ -205,16 +232,26 @@ export default function usePatientDashboardCareNetwork(
         return;
       }
 
-      const expectedRole = caregiverRole;
+      const professionalUser =
+        user as CareUserWithProfessionalData;
 
-      if (user.role !== expectedRole) {
+      if (!matchesCaregiverRole(professionalUser, caregiverRole)) {
+        const roleMessages: Record<CaregiverRole, string> = {
+          PROFESSIONAL:
+            "Essa conta não está cadastrada como médico. Confira o e-mail e o perfil informado no cadastro.",
+
+          CLINICAL_CAREGIVER:
+            "Essa conta não está cadastrada como cuidador clínico.",
+
+          HOME_CAREGIVER:
+            "Essa conta não está cadastrada como cuidador domiciliar.",
+        };
+
         setFeedback({
           type: "error",
-          message:
-            caregiverRole === "CLINICAL_CAREGIVER"
-              ? "Essa conta não está cadastrada como cuidador clínico."
-              : "Essa conta não está cadastrada como cuidador domiciliar.",
+          message: roleMessages[caregiverRole],
         });
+
         return;
       }
 
@@ -356,6 +393,7 @@ export default function usePatientDashboardCareNetwork(
             ? err.message
             : "Não foi possível remover o cuidador.",
       });
+
       return false;
     } finally {
       setRemovingCaregiverId(null);
@@ -367,7 +405,9 @@ export default function usePatientDashboardCareNetwork(
       links
         .filter((link) => link.status === "ACTIVE")
         .map(toCarePerson)
-        .filter((person): person is CarePerson => person !== null),
+        .filter(
+          (person): person is CarePerson => person !== null,
+        ),
     [links],
   );
 
@@ -376,7 +416,9 @@ export default function usePatientDashboardCareNetwork(
       links
         .filter((link) => link.status === "PENDING")
         .map(toCarePerson)
-        .filter((person): person is CarePerson => person !== null),
+        .filter(
+          (person): person is CarePerson => person !== null,
+        ),
     [links],
   );
 
