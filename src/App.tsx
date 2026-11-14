@@ -1,8 +1,11 @@
-import "./modules/app/preferences"; // aplica texto maior, contraste e animações já na abertura
+
+import "./modules/app/preferences";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import AppLayout from "./components/app/AppLayout";
 import RequireSession from "./components/app/RequireSession";
 import SessionProvider from "./modules/session/SessionProvider";
+import { useSession } from "./modules/session/session";
+
 import AgendaPage from "./pages/app/AgendaPage";
 import ClinicalEvolutionPage from "./pages/app/ClinicalEvolutionPage";
 import DashboardPage from "./pages/app/DashboardPage";
@@ -16,19 +19,28 @@ import ReportsPage from "./pages/app/ReportsPage";
 import SettingsPage from "./pages/app/SettingsPage";
 import TreatmentPlanPage from "./pages/app/TreatmentPlanPage";
 import UnderConstructionPage from "./pages/app/UnderConstructionPage";
-import LoginPage from "./pages/auth/LoginPage";
-import RegisterPage from "./pages/auth/RegisterPage";
-import LandingPage from "./pages/landing/LandingPage";
-import { useSession } from "./modules/session/session";
 import MessagesPage from "./pages/app/MessagesPage";
 import MonitoringPage from "./pages/app/MonitoringPage";
 import CareNetworkPage from "./pages/app/CareNetworkPage";
+
+import LoginPage from "./pages/auth/LoginPage";
+import RegisterPage from "./pages/auth/RegisterPage";
+import LandingPage from "./pages/landing/LandingPage";
 import AdminPage from "./pages/admin/AdminPage";
+
+import TermsOfUsePage from "./pages/legal/TermsOfUsePage";
+import PrivacyPolicyPage from "./pages/legal/PrivacyPolicyPage";
 
 function AgendaRoute() {
   const { session } = useSession();
+
   if (!session) return null;
-  return session.profile === "medico" ? <DoctorAgendaPage /> : <AgendaPage />;
+
+  return session.profile === "medico" ? (
+    <DoctorAgendaPage />
+  ) : (
+    <AgendaPage />
+  );
 }
 
 function App() {
@@ -39,7 +51,15 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/cadastro" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
+
+          <Route path="/termos-de-uso" element={<TermsOfUsePage />} />
+          <Route
+            path="/politica-de-privacidade"
+            element={<PrivacyPolicyPage />}
+          />
+
           <Route path="/admin" element={<AdminPage />} />
+
           <Route
             path="/app"
             element={
@@ -53,10 +73,19 @@ function App() {
             <Route path="agenda" element={<AgendaRoute />} />
             <Route path="exercicios" element={<ExercisesPage />} />
             <Route path="medicamentos" element={<MedicationsPage />} />
-            <Route path="plano-de-tratamento" element={<TreatmentPlanPage />} />
+            <Route
+              path="plano-de-tratamento"
+              element={<TreatmentPlanPage />}
+            />
             <Route path="pacientes" element={<PatientsPage />} />
-            <Route path="pacientes/:patientId" element={<PatientDetailPage />} />
-            <Route path="evolucao-clinica" element={<ClinicalEvolutionPage />} />
+            <Route
+              path="pacientes/:patientId"
+              element={<PatientDetailPage />}
+            />
+            <Route
+              path="evolucao-clinica"
+              element={<ClinicalEvolutionPage />}
+            />
             <Route path="relatorios" element={<ReportsPage />} />
             <Route path="perfil" element={<ProfilePage />} />
             <Route path="configuracoes" element={<SettingsPage />} />
@@ -65,6 +94,7 @@ function App() {
             <Route path="rede-de-cuidado" element={<CareNetworkPage />} />
             <Route path=":section" element={<UnderConstructionPage />} />
           </Route>
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </SessionProvider>
