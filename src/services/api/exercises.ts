@@ -188,3 +188,74 @@ export async function getPatientExercises(
 ): Promise<PatientExercisesData> {
   return loadPatientExercises(accessToken, patientId);
 }
+
+
+export async function createPatientExercisePlan(
+  accessToken: string,
+  patientId: string,
+  data: PatientExercisePlanData,
+): Promise<ExerciseRecord<PatientExercisePlanData>> {
+  return mutateExerciseRecord(
+    "/records/exercise-plans",
+    accessToken,
+    "POST",
+    { patientId, data },
+  );
+}
+
+export async function updatePatientExercisePlan(
+  accessToken: string,
+  recordId: string,
+  data: PatientExercisePlanData,
+): Promise<ExerciseRecord<PatientExercisePlanData>> {
+  return mutateExerciseRecord(
+    `/records/exercise-plans/${encodeURIComponent(recordId)}`,
+    accessToken,
+    "PATCH",
+    { data },
+  );
+}
+
+async function mutateExerciseRecord<T>(
+  path: string,
+  accessToken: string,
+  method: "POST" | "PATCH",
+  body: unknown,
+): Promise<T> {
+  if (!API_URL) {
+    throw new Error("A URL da API não está configurada.");
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error(
+      "Não foi possível conectar ao servidor. Verifique se a API está ativa.",
+    );
+  }
+
+  const result = (await response.json().catch(() => null)) as
+    | ApiResponse<T>
+    | null;
+
+  if (!response.ok || !result?.success) {
+    const message = result?.error?.message ?? result?.message;
+
+    throw new Error(
+      Array.isArray(message)
+        ? message.join(" ")
+        : message ?? "Não foi possível salvar o plano de exercícios.",
+    );
+  }
+
+  return result.data;
+}
