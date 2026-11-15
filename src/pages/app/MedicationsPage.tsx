@@ -43,7 +43,8 @@ export default function MedicationsPage() {
 
   const picksPatient =
     session?.profile === "medico" ||
-    session?.profile === "cuidador-clinico";
+    session?.profile === "cuidador-clinico" ||
+    session?.profile === "cuidador-domiciliar";
 
   useEffect(() => {
     let cancelled = false;
@@ -56,12 +57,15 @@ export default function MedicationsPage() {
 
       try {
         if (picksPatient) {
-          const result = await getAccessiblePatients(session.accessToken);
+          const result = await getAccessiblePatients(
+            session.accessToken,
+          );
 
           const options = result
             .map(toPatientOption)
             .filter(
-              (patient): patient is PatientOption => patient !== null,
+              (patient): patient is PatientOption =>
+                patient !== null,
             );
 
           if (!cancelled) {
@@ -135,7 +139,9 @@ export default function MedicationsPage() {
                   value: patient.id,
                 }))}
                 value={selectedId}
-                onChange={(event) => setSelectedId(event.target.value)}
+                onChange={(event) =>
+                  setSelectedId(event.target.value)
+                }
               />
             </div>
           ) : (
@@ -148,16 +154,20 @@ export default function MedicationsPage() {
       )}
 
       {!picksPatient && patientsError && (
-        <p className="text-sm text-alert-text">{patientsError}</p>
+        <p className="text-sm text-alert-text">
+          {patientsError}
+        </p>
       )}
 
       {patientId && (
         <MedicationsPanel
           key={patientId}
           patientId={patientId}
-          canConfirm={session.profile === "paciente"}
+          canConfirm={
+            session.profile === "paciente" ||
+            session.profile === "cuidador-domiciliar"
+          }
           prescribe={session.profile === "medico"}
-          authorName={session.name}
         />
       )}
     </div>

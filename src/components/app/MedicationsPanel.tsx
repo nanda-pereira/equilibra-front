@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   createPatientMedication,
@@ -22,7 +23,7 @@ type Props = {
   patientId: string;
   canConfirm: boolean;
   prescribe: boolean;
-  authorName: string;
+  authorName?: string;
 };
 
 function getErrorMessage(error: unknown) {
@@ -35,8 +36,10 @@ function getMedicationName(
   data: PatientMedicationsData,
   medicationId: string,
 ) {
-  return data.medications.find((med) => med._id === medicationId)?.data.name
-    ?? "Medicamento";
+  return (
+    data.medications.find((med) => med._id === medicationId)?.data.name ??
+    "Medicamento"
+  );
 }
 
 export default function MedicationsPanel({
@@ -62,26 +65,33 @@ export default function MedicationsPanel({
   const [times, setTimes] = useState([""]);
   const [notes, setNotes] = useState("");
 
-  const loadData = useCallback(async (showLoading = true) => {
-    if (!accessToken || !patientId) return;
+  const loadData = useCallback(
+    async (showLoading = true) => {
+      if (!accessToken || !patientId) return;
 
-    if (showLoading) {
-      setLoading(true);
-      setError("");
-    }
+      if (showLoading) {
+        setLoading(true);
+        setError("");
+      }
 
-    try {
-      const result = await getPatientMedications(accessToken, patientId);
-      setData(result);
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [accessToken, patientId]);
+      try {
+        const result = await getPatientMedications(
+          accessToken,
+          patientId,
+        );
+        setData(result);
+      } catch (err) {
+        setError(getErrorMessage(err));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [accessToken, patientId],
+  );
 
   useEffect(() => {
     if (!accessToken || !patientId) {
+      setLoading(false);
       return;
     }
 
@@ -89,7 +99,10 @@ export default function MedicationsPanel({
 
     const fetchData = async () => {
       try {
-        const result = await getPatientMedications(accessToken, patientId);
+        const result = await getPatientMedications(
+          accessToken,
+          patientId,
+        );
 
         if (active) {
           setData(result);
@@ -118,41 +131,55 @@ export default function MedicationsPanel({
   );
 
   const today = new Date();
-  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const todayKey = `${today.getFullYear()}-${String(
+    today.getMonth() + 1,
+  ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
-  const scheduledDoses = prescriptions.flatMap((prescription) => {
-    const schedule = prescription.data.schedule ?? [];
+  const scheduledDoses = prescriptions
+    .flatMap((prescription) => {
+      const schedule = prescription.data.schedule ?? [];
 
-    return schedule.map((time) => {
-      const scheduledAt = new Date(`${todayKey}T${time}:00`);
-      const taken = (data?.medicationLogs ?? []).some((log) => {
-        if (log.data.prescriptionId !== prescription._id) return false;
-        if (!log.data.administeredAt) return false;
+      return schedule.map((time) => {
+        const scheduledAt = new Date(`${todayKey}T${time}:00`);
 
-        const administeredAt = new Date(log.data.administeredAt);
-        return (
-          !Number.isNaN(administeredAt.getTime()) &&
-          administeredAt.toDateString() === today.toDateString() &&
-          (log.data.status ?? "").toUpperCase() !== "SKIPPED" &&
-          Math.abs(
-            administeredAt.getTime() - scheduledAt.getTime(),
-          ) < 2 * 60 * 60 * 1000
-        );
+        const taken = (data?.medicationLogs ?? []).some((log) => {
+          if (log.data.prescriptionId !== prescription._id) {
+            return false;
+          }
+
+          if (!log.data.administeredAt) return false;
+
+          const administeredAt = new Date(log.data.administeredAt);
+
+          return (
+            !Number.isNaN(administeredAt.getTime()) &&
+            administeredAt.toDateString() === today.toDateString() &&
+            (log.data.status ?? "").toUpperCase() !== "SKIPPED" &&
+            Math.abs(
+              administeredAt.getTime() - scheduledAt.getTime(),
+            ) < 2 * 60 * 60 * 1000
+          );
+        });
+
+        return {
+          key: `${prescription._id}-${time}`,
+          prescriptionId: prescription._id,
+          name: getMedicationName(
+            data!,
+            prescription.data.medicationId,
+          ),
+          time,
+          dose: `${prescription.data.dose} ${prescription.data.unit}`,
+          taken,
+          scheduledAt: scheduledAt.toISOString(),
+        };
       });
-
-      return {
-        key: `${prescription._id}-${time}`,
-        prescriptionId: prescription._id,
-        name: getMedicationName(data!, prescription.data.medicationId),
-        time,
-        dose: `${prescription.data.dose} ${prescription.data.unit}`,
-        taken,
-        scheduledAt: scheduledAt.toISOString(),
-      };
-    });
-  }).sort((a, b) => a.time.localeCompare(b.time));
+    })
+    .sort((a, b) => a.time.localeCompare(b.time));
 
   function startAdding() {
+    if (!prescribe) return;
+
     setName("");
     setDose("1");
     setUnit("comprimido");
@@ -167,6 +194,12 @@ export default function MedicationsPanel({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!prescribe) {
+      setOpen(false);
+      return;
+    }
+
     setSubmitted(true);
     setFlash("");
     setError("");
@@ -184,7 +217,7 @@ export default function MedicationsPanel({
       numericDose <= 0 ||
       !unit.trim() ||
       !validTimes ||
-      (prescribe && !route.trim())
+      !route.trim()
     ) {
       return;
     }
@@ -206,21 +239,16 @@ export default function MedicationsPanel({
         },
       );
 
-      if (prescribe) {
-        await createPatientPrescription(accessToken, patientId, {
-          medicationId: medication._id,
-          dose: numericDose,
-          unit: unit.trim(),
-          route: route.trim(),
-          schedule: [...times].sort(),
-          instructions: notes.trim() || undefined,
-        });
+      await createPatientPrescription(accessToken, patientId, {
+        medicationId: medication._id,
+        dose: numericDose,
+        unit: unit.trim(),
+        route: route.trim(),
+        schedule: [...times].sort(),
+        instructions: notes.trim() || undefined,
+      });
 
-        setFlash("Medicamento e prescrição cadastrados com sucesso.");
-      } else {
-        setFlash("Medicamento cadastrado com sucesso.");
-      }
-
+      setFlash("Medicamento e prescrição cadastrados com sucesso.");
       setOpen(false);
       await loadData();
     } catch (err) {
@@ -234,7 +262,7 @@ export default function MedicationsPanel({
     prescriptionId: string,
     time: string,
   ) {
-    if (!accessToken || !data) return;
+    if (!canConfirm || !accessToken || !data) return;
 
     setError("");
     setFlash("");
@@ -285,7 +313,9 @@ export default function MedicationsPanel({
 
       <GlassCard title="Horários de hoje">
         {loading ? (
-          <p className="py-4 text-sm text-ink-soft">Carregando horários...</p>
+          <p className="py-4 text-sm text-ink-soft">
+            Carregando horários...
+          </p>
         ) : scheduledDoses.length === 0 ? (
           <EmptyState title="Nenhum medicamento programado para hoje" />
         ) : (
@@ -322,13 +352,17 @@ export default function MedicationsPanel({
       <GlassCard
         title="Medicamentos cadastrados"
         action={
-          <SmallButton variant="solid" onClick={startAdding}>
-            {prescribe ? "Prescrever medicamento" : "Adicionar medicamento"}
-          </SmallButton>
+          prescribe ? (
+            <SmallButton variant="solid" onClick={startAdding}>
+              Prescrever medicamento
+            </SmallButton>
+          ) : undefined
         }
       >
         {loading ? (
-          <p className="py-4 text-sm text-ink-soft">Carregando medicamentos...</p>
+          <p className="py-4 text-sm text-ink-soft">
+            Carregando medicamentos...
+          </p>
         ) : !data?.medications.length ? (
           <EmptyState title="Nenhum medicamento cadastrado" />
         ) : (
@@ -349,11 +383,13 @@ export default function MedicationsPanel({
                           .map(
                             (item) =>
                               `${item.data.dose} ${item.data.unit} · ${
-                                item.data.schedule?.join(", ") ?? "Sem horários"
+                                item.data.schedule?.join(", ") ??
+                                "Sem horários"
                               }`,
                           )
                           .join(" | ")
-                      : medication.data.instructions ?? "Sem prescrição ativa"
+                      : medication.data.instructions ??
+                        "Sem prescrição ativa"
                   }
                 />
               );
@@ -362,49 +398,55 @@ export default function MedicationsPanel({
         )}
       </GlassCard>
 
-      <Modal
-        open={open}
-        title={prescribe ? "Prescrever medicamento" : "Adicionar medicamento"}
-        onClose={() => !saving && setOpen(false)}
-      >
-        <form noValidate onSubmit={handleSubmit}>
-          <div className="grid gap-x-6 sm:grid-cols-2">
-            <Input
-              label="Medicamento"
-              placeholder="Nome do medicamento"
-              autoComplete="off"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              error={
-                submitted && name.trim().length < 2
-                  ? "Informe o nome do medicamento"
-                  : undefined
-              }
-            />
-            <Input
-              label="Dose (quantidade)"
-              placeholder="Ex.: 1"
-              autoComplete="off"
-              value={dose}
-              onChange={(e) => setDose(e.target.value)}
-              error={
-                submitted &&
-                (!Number.isFinite(Number(dose.replace(",", "."))) ||
-                  Number(dose.replace(",", ".")) <= 0)
-                  ? "Informe uma quantidade válida"
-                  : undefined
-              }
-            />
-            <Input
-              label="Unidade da dose"
-              placeholder="Ex.: comprimido, mg, mL"
-              autoComplete="off"
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-              error={submitted && !unit.trim() ? "Informe a unidade" : undefined}
-            />
+      {prescribe && (
+        <Modal
+          open={open}
+          title="Prescrever medicamento"
+          onClose={() => !saving && setOpen(false)}
+        >
+          <form noValidate onSubmit={handleSubmit}>
+            <div className="grid gap-x-6 sm:grid-cols-2">
+              <Input
+                label="Medicamento"
+                placeholder="Nome do medicamento"
+                autoComplete="off"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                error={
+                  submitted && name.trim().length < 2
+                    ? "Informe o nome do medicamento"
+                    : undefined
+                }
+              />
 
-            {prescribe && (
+              <Input
+                label="Dose (quantidade)"
+                placeholder="Ex.: 1"
+                autoComplete="off"
+                value={dose}
+                onChange={(e) => setDose(e.target.value)}
+                error={
+                  submitted &&
+                  (!Number.isFinite(Number(dose.replace(",", "."))) ||
+                    Number(dose.replace(",", ".")) <= 0)
+                    ? "Informe uma quantidade válida"
+                    : undefined
+                }
+              />
+
+              <Input
+                label="Unidade da dose"
+                placeholder="Ex.: comprimido, mg, mL"
+                autoComplete="off"
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                error={
+                  submitted && !unit.trim()
+                    ? "Informe a unidade"
+                    : undefined
+                }
+              />
+
               <Input
                 label="Via de administração"
                 placeholder="Conforme prescrição médica"
@@ -417,89 +459,97 @@ export default function MedicationsPanel({
                     : undefined
                 }
               />
-            )}
-          </div>
-
-          <fieldset className="mb-2 min-w-0">
-            <legend className="mb-2.5 text-base text-ink">Horários</legend>
-
-            <div className="flex flex-col gap-3">
-              {times.map((time, index) => (
-                <div key={index} className="flex items-center gap-3">
-                  <input
-                    type="time"
-                    aria-label={`Horário ${index + 1}`}
-                    value={time}
-                    onChange={(e) =>
-                      setTimes((list) =>
-                        list.map((item, i) =>
-                          i === index ? e.target.value : item,
-                        ),
-                      )
-                    }
-                    className="h-11 w-full rounded-full border border-brand bg-transparent px-6 text-sm text-ink focus:border-action focus:outline-none focus:ring-4 focus:ring-action/15"
-                  />
-
-                  {times.length > 1 && (
-                    <button
-                      type="button"
-                      aria-label={`Remover horário ${index + 1}`}
-                      onClick={() =>
-                        setTimes((list) => list.filter((_, i) => i !== index))
-                      }
-                      className="flex size-11 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-mint-100 focus-visible:outline-2 focus-visible:outline-action"
-                    >
-                      <Icon icon={CloseIcon} size={20} />
-                    </button>
-                  )}
-                </div>
-              ))}
             </div>
 
-            <p aria-live="polite" className="mt-1 min-h-5 text-sm text-alert-text">
-              {submitted &&
-              (times.some((time) => !time) ||
-                new Set(times).size !== times.length)
-                ? "Preencha todos os horários sem repetir."
-                : ""}
-            </p>
+            <fieldset className="mb-2 min-w-0">
+              <legend className="mb-2.5 text-base text-ink">
+                Horários
+              </legend>
 
-            {times.length < 6 && (
-              <button
-                type="button"
-                onClick={() => setTimes((list) => [...list, ""])}
-                className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-action hover:text-action-hover focus-visible:outline-2 focus-visible:outline-action"
+              <div className="flex flex-col gap-3">
+                {times.map((time, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-3"
+                  >
+                    <input
+                      type="time"
+                      aria-label={`Horário ${index + 1}`}
+                      value={time}
+                      onChange={(e) =>
+                        setTimes((list) =>
+                          list.map((item, i) =>
+                            i === index ? e.target.value : item,
+                          ),
+                        )
+                      }
+                      className="h-11 w-full rounded-full border border-brand bg-transparent px-6 text-sm text-ink focus:border-action focus:outline-none focus:ring-4 focus:ring-action/15"
+                    />
+
+                    {times.length > 1 && (
+                      <button
+                        type="button"
+                        aria-label={`Remover horário ${index + 1}`}
+                        onClick={() =>
+                          setTimes((list) =>
+                            list.filter((_, i) => i !== index),
+                          )
+                        }
+                        className="flex size-11 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-mint-100 focus-visible:outline-2 focus-visible:outline-action"
+                      >
+                        <Icon icon={CloseIcon} size={20} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <p
+                aria-live="polite"
+                className="mt-1 min-h-5 text-sm text-alert-text"
               >
-                <Icon icon={PlusIcon} size={18} />
-                Adicionar horário
-              </button>
-            )}
-          </fieldset>
+                {submitted &&
+                (times.some((time) => !time) ||
+                  new Set(times).size !== times.length)
+                  ? "Preencha todos os horários sem repetir."
+                  : ""}
+              </p>
 
-          <Textarea
-            label="Observações (opcional)"
-            placeholder="Orientações já definidas pela equipe de saúde"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
+              {times.length < 6 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTimes((list) => [...list, ""])
+                  }
+                  className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-action hover:text-action-hover focus-visible:outline-2 focus-visible:outline-action"
+                >
+                  <Icon icon={PlusIcon} size={18} />
+                  Adicionar horário
+                </button>
+              )}
+            </fieldset>
 
-          {!prescribe && (
-            <p className="mb-4 rounded-[20px] bg-info-bg px-4 py-3 text-sm text-info-text">
-              Registre apenas medicamentos indicados pela equipe de saúde.
-              Este cadastro não cria uma prescrição médica.
-            </p>
-          )}
+            <Textarea
+              label="Observações (opcional)"
+              placeholder="Orientações já definidas pela equipe de saúde"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
 
-          <div className="flex flex-wrap gap-3">
-            <SmallButton type="submit" variant="solid">
-              {saving ? "Salvando..." : "Salvar"}
-            </SmallButton>
-            <SmallButton onClick={() => !saving && setOpen(false)}>
-              Cancelar
-            </SmallButton>
-          </div>
-        </form>
-      </Modal>
+            <div className="flex flex-wrap gap-3">
+              <SmallButton type="submit" variant="solid">
+                {saving ? "Salvando..." : "Salvar"}
+              </SmallButton>
+
+              <SmallButton
+                onClick={() => !saving && setOpen(false)}
+              >
+                Cancelar
+              </SmallButton>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }
