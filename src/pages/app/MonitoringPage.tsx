@@ -5,6 +5,7 @@ import GlassCard from "../../components/app/GlassCard";
 import PageHeader from "../../components/app/PageHeader";
 import SmallButton from "../../components/app/SmallButton";
 import { BarTrendChart } from "../../components/app/charts";
+import Select from "../../components/ui/Select";
 import { useSession } from "../../modules/session/session";
 import {
   getMonitoringHistory,
@@ -317,11 +318,8 @@ export default function MonitoringPage() {
         if (!cancelled) {
           setPatients(options);
 
-          setPatientId((current) =>
-            options.some((patient) => patient.id === current)
-              ? current
-              : options[0]?.id ?? "",
-          );
+          // Não seleciona automaticamente o primeiro paciente.
+          setPatientId("");
         }
       } catch (cause) {
         if (!cancelled) {
@@ -520,7 +518,12 @@ export default function MonitoringPage() {
 
   if (
     !session ||
-    !["paciente", "cuidador-clinico"].includes(session.profile)
+    ![
+      "paciente",
+      "medico",
+      "cuidador-clinico",
+      "cuidador-domiciliar",
+    ].includes(session.profile)
   ) {
     return (
       <div className="flex flex-col gap-6">
@@ -547,9 +550,9 @@ export default function MonitoringPage() {
 
   const hasAnyMonitoringData = Boolean(
     latestBatch ||
-      latestAnalysis ||
-      latestWellbeing ||
-      (summary?.recordsLast24Hours ?? 0) > 0,
+    latestAnalysis ||
+    latestWellbeing ||
+    (summary?.recordsLast24Hours ?? 0) > 0,
   );
 
   const analysisStatus =
@@ -616,14 +619,7 @@ export default function MonitoringPage() {
       <GlassCard title="Filtros">
         <div className="flex flex-col gap-4">
           {!isPatient && (
-            <div>
-              <p
-                id="patient-filter"
-                className="mb-2 text-sm font-medium text-ink"
-              >
-                Paciente
-              </p>
-
+            <div className="max-w-xl">
               {loadingPatients ? (
                 <p className="text-sm text-ink-soft">
                   Carregando pacientes…
@@ -633,27 +629,20 @@ export default function MonitoringPage() {
                   Nenhum paciente disponível para consulta.
                 </p>
               ) : (
-                <div
-                  role="group"
-                  aria-labelledby="patient-filter"
-                  className="flex flex-wrap gap-2.5"
-                >
-                  {patients.map((patient) => (
-                    <button
-                      key={patient.id}
-                      type="button"
-                      aria-pressed={patient.id === patientId}
-                      onClick={() => {
-                        setPatientId(patient.id);
-                        setSensorFilter("all");
-                        setVisible(10);
-                      }}
-                      className={pill(patient.id === patientId)}
-                    >
-                      {patient.name}
-                    </button>
-                  ))}
-                </div>
+                <Select
+                  label="Paciente"
+                  placeholder="Selecione um paciente"
+                  options={patients.map((patient) => ({
+                    label: patient.name,
+                    value: patient.id,
+                  }))}
+                  value={patientId}
+                  onChange={(event) => {
+                    setPatientId(event.target.value);
+                    setSensorFilter("all");
+                    setVisible(10);
+                  }}
+                />
               )}
             </div>
           )}
