@@ -1,4 +1,3 @@
-
 import { useEffect, useState, type FormEvent } from "react";
 import GlassCard from "../../components/app/GlassCard";
 import Info from "../../components/app/Info";
@@ -23,6 +22,7 @@ import {
 type Draft = {
   name: string;
   phone: string;
+  dateOfBirth: string;
   emergencyName: string;
   emergencyPhone: string;
 };
@@ -51,7 +51,6 @@ function validate(draft: Draft, isPatient: boolean): Errors {
   return errors;
 }
 
-
 function getEmergencyContact(patient?: PatientProfile) {
   const contacts = patient?.emergencyContacts;
 
@@ -68,6 +67,23 @@ function getEmergencyContact(patient?: PatientProfile) {
     phone: String(contact.phone ?? ""),
     relationship: String(contact.relationship ?? ""),
   };
+}
+
+function formatBirthDate(value?: string): string {
+  if (!value) return "Não informado";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Não informado";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "UTC",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
 }
 
 export default function ProfilePage() {
@@ -107,7 +123,11 @@ export default function ProfilePage() {
         let id = "";
 
         if (session.profile === "paciente") {
-          patientData = await getMyPatientProfile(session.accessToken, session?.userId ?? "");
+          patientData = await getMyPatientProfile(
+            session.accessToken,
+            session.userId ?? "",
+          );
+
           id = String(patientData.id ?? patientData._id ?? "");
         }
 
@@ -152,6 +172,7 @@ export default function ProfilePage() {
     setDraft({
       name: user.fullName ?? session.name,
       phone: formatPhone(user.phone ?? ""),
+      dateOfBirth: user.dateOfBirth?.slice(0, 10) ?? "",
       emergencyName: emergency.name,
       emergencyPhone: formatPhone(emergency.phone),
     });
@@ -182,6 +203,7 @@ export default function ProfilePage() {
         {
           fullName: draft.name.trim(),
           phone: onlyDigits(draft.phone),
+          dateOfBirth: draft.dateOfBirth || undefined,
         },
       );
 
@@ -305,6 +327,16 @@ export default function ProfilePage() {
                     error={submitted ? errors.phone : undefined}
                   />
 
+                  <Input
+                    label="Data de nascimento"
+                    type="date"
+                    autoComplete="bday"
+                    value={draft.dateOfBirth}
+                    onChange={(e) =>
+                      set({ dateOfBirth: e.target.value })
+                    }
+                  />
+
                   {isPatient && (
                     <>
                       <Input
@@ -375,6 +407,10 @@ export default function ProfilePage() {
 
                 <Info label="Telefone">
                   {user.phone || "Não informado"}
+                </Info>
+
+                <Info label="Data de nascimento">
+                  {formatBirthDate(user.dateOfBirth)}
                 </Info>
 
                 {isPatient && (

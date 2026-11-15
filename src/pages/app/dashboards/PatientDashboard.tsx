@@ -1,7 +1,7 @@
-
 import { useEffect, useState } from "react";
 import EmptyState from "../../../components/app/EmptyState";
 import GlassCard from "../../../components/app/GlassCard";
+import PageHeader from "../../../components/app/PageHeader";
 import SmallButton from "../../../components/app/SmallButton";
 import { useSession } from "../../../modules/session/session";
 import {
@@ -183,6 +183,8 @@ export default function PatientDashboard() {
 
   return (
     <div className="flex flex-col gap-6">
+      <PageHeader />
+
       <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
         <PatientDashboardMedications
           loading={medicationsLoading}
@@ -309,7 +311,9 @@ export default function PatientDashboard() {
                       {observation.data.category || "Observação clínica"}
                     </h3>
                     <span className="text-xs text-ink-soft">
-                      {formatObservationDate(getObservationDate(observation))}
+                      {formatObservationDate(
+                        getObservationDate(observation),
+                      )}
                     </span>
                   </div>
 

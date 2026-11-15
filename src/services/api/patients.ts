@@ -1,23 +1,28 @@
-
 const API_URL: string | undefined = import.meta.env.VITE_API_URL;
 
 export type PatientProfile = {
   _id?: string;
   id?: string;
   userId?:
-  | string
-  | {
-    _id?: string;
-    id?: string;
-    fullName?: string;
-    email?: string;
-  };
+    | string
+    | {
+        _id?: string;
+        id?: string;
+        fullName?: string;
+        email?: string;
+        phone?: string;
+        dateOfBirth?: string;
+      };
   clinicalProfile?: {
+    diagnosis?: string;
     diagnosisDate?: string;
+    stage?: string;
     followUpNotes?: string;
   };
   monitoringSettings?: Record<string, unknown>;
   emergencyContacts?: Record<string, unknown>;
+  responsibleProfessionalId?: string;
+  status?: string;
 };
 
 export type PatientOverview = {
@@ -326,19 +331,19 @@ export type PatientCareLink = {
   permissions?: string[];
   userId: string | CareNetworkUser;
   patientId?:
-  | string
-  | {
-    _id?: string;
-    id?: string;
-    userId?:
     | string
     | {
-      _id?: string;
-      id?: string;
-      fullName?: string;
-      email?: string;
-    };
-  };
+        _id?: string;
+        id?: string;
+        userId?:
+          | string
+          | {
+              _id?: string;
+              id?: string;
+              fullName?: string;
+              email?: string;
+            };
+      };
 };
 
 export type CareUser = {
@@ -384,31 +389,31 @@ export async function inviteCaregiver(
   const permissions =
     relationship === "HOME_CAREGIVER"
       ? [
-        "patient.profile.read",
-        "patient.events.read",
-        "patient.medications.read",
-        "patient.appointments.read",
-        "patient.exercises.read",
-      ]
+          "patient.profile.read",
+          "patient.events.read",
+          "patient.medications.read",
+          "patient.appointments.read",
+          "patient.exercises.read",
+        ]
       : relationship === "PROFESSIONAL"
         ? [
-          "patient.profile.read",
-          "patient.monitoring.read",
-          "patient.events.read",
-          "patient.medications.read",
-          "patient.appointments.read",
-          "patient.exercises.read",
-          "patient.diary.read",
-          "patient.diary.write",
-        ]
+            "patient.profile.read",
+            "patient.monitoring.read",
+            "patient.events.read",
+            "patient.medications.read",
+            "patient.appointments.read",
+            "patient.exercises.read",
+            "patient.diary.read",
+            "patient.diary.write",
+          ]
         : [
-          "patient.profile.read",
-          "patient.monitoring.read",
-          "patient.events.read",
-          "patient.medications.read",
-          "patient.appointments.read",
-          "patient.exercises.read",
-        ];
+            "patient.profile.read",
+            "patient.monitoring.read",
+            "patient.events.read",
+            "patient.medications.read",
+            "patient.appointments.read",
+            "patient.exercises.read",
+          ];
 
   return mutate<PatientCareLink>(
     "/patient-links",
@@ -478,6 +483,20 @@ export async function getAccessiblePatients(
   accessToken: string,
 ): Promise<PatientProfile[]> {
   return request<PatientProfile[]>("/patients", accessToken);
+}
+
+/**
+ * Busca os dados completos de um paciente específico.
+ * O backend retorna userId populado com os dados disponíveis do usuário.
+ */
+export async function getPatientById(
+  accessToken: string,
+  patientId: string,
+): Promise<PatientProfile> {
+  return request<PatientProfile>(
+    `/patients/${encodeURIComponent(patientId)}`,
+    accessToken,
+  );
 }
 
 export async function createPatientMedication(
@@ -592,6 +611,7 @@ export type UserProfileData = {
   fullName: string;
   email: string;
   phone?: string;
+  dateOfBirth?: string;
   role?: string;
 };
 
@@ -603,7 +623,11 @@ export async function getMyUserProfile(
 
 export async function updateMyUserProfile(
   accessToken: string,
-  data: { fullName: string; phone: string },
+  data: {
+    fullName?: string;
+    phone?: string;
+    dateOfBirth?: string;
+  },
 ): Promise<UserProfileData> {
   return mutate<UserProfileData>(
     "/users/me",

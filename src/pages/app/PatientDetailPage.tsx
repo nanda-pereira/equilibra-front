@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router";
 import EmptyState from "../../components/app/EmptyState";
@@ -9,7 +10,7 @@ import PageHeader from "../../components/app/PageHeader";
 import SmallButton from "../../components/app/SmallButton";
 import { CalendarIcon, MessageIcon } from "../../components/ui/icons";
 import {
-  getAccessiblePatients,
+  getPatientById,
   getPatientAppointments,
   getPatientObservations,
   type ObservationData,
@@ -39,10 +40,21 @@ type ObservationItem = {
   createdAt?: string;
 };
 
+type PatientProfileWithOptionalFields = PatientProfile & {
+  diagnosis?: string;
+  stage?: string;
+  caregiver?: string;
+  clinicalProfile?: PatientProfile["clinicalProfile"] & {
+    diagnosis?: string;
+    stage?: string;
+  };
+};
+
 const DATE_FORMAT = new Intl.DateTimeFormat("pt-BR", {
   day: "2-digit",
   month: "long",
   year: "numeric",
+  timeZone: "UTC",
 });
 
 const DATE_TIME_FORMAT = new Intl.DateTimeFormat("pt-BR", {
@@ -53,35 +65,39 @@ const DATE_TIME_FORMAT = new Intl.DateTimeFormat("pt-BR", {
   minute: "2-digit",
 });
 
-function getPatientId(patient: PatientProfile) {
+function getPatientId(patient: PatientProfile): string {
   return patient.id ?? patient._id ?? "";
 }
 
-function toPatientItem(patient: PatientProfile): PatientItem | null {
-  const id = getPatientId(patient);
-  if (!id) return null;
-
+function toPatientItem(
+  patient: PatientProfile,
+): PatientItem {
+  const profile = patient as PatientProfileWithOptionalFields;
   const user = patient.userId;
-  const userData =
-    typeof user === "object" && user !== null ? user : undefined;
 
-  const profile = patient as PatientProfile & {
-    birthDate?: string;
-    phone?: string;
-    diagnosis?: string;
-    stage?: string;
-    caregiver?: string;
-  };
+  const userData =
+    typeof user === "object" && user !== null
+      ? user
+      : undefined;
+
+  const name =
+    userData?.fullName?.trim() ||
+    userData?.email?.trim() ||
+    "Paciente";
 
   return {
-    id,
-    name: userData?.fullName || userData?.email || "Paciente",
-    email: userData?.email || "",
-    birthDate: profile.birthDate,
-    phone: profile.phone,
-    diagnosis: profile.diagnosis,
+    id: getPatientId(patient),
+    name,
+    email: userData?.email ?? "",
+    birthDate: userData?.dateOfBirth,
+    phone: userData?.phone,
+    diagnosis:
+      profile.diagnosis ??
+      profile.clinicalProfile?.diagnosis,
     diagnosisDate: patient.clinicalProfile?.diagnosisDate,
-    stage: profile.stage,
+    stage:
+      profile.stage ??
+      profile.clinicalProfile?.stage,
     caregiver: profile.caregiver,
     notes: patient.clinicalProfile?.followUpNotes,
   };
@@ -98,20 +114,26 @@ function toObservationItem(
   };
 }
 
-function formatDate(value?: string) {
+function formatDate(value?: string): string {
   if (!value) return "Não informado";
 
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Não informado";
+
+  if (Number.isNaN(date.getTime())) {
+    return "Não informado";
+  }
 
   return DATE_FORMAT.format(date);
 }
 
-function formatDateTime(value?: string) {
+function formatDateTime(value?: string): string {
   if (!value) return "Data não informada";
 
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Data não informada";
+
+  if (Number.isNaN(date.getTime())) {
+    return "Data não informada";
+  }
 
   return DATE_TIME_FORMAT.format(date);
 }
@@ -121,8 +143,12 @@ export default function PatientDetailPage() {
   const { patientId = "" } = useParams();
 
   const [patient, setPatient] = useState<PatientItem | null>(null);
-  const [appointments, setAppointments] = useState<PatientAppointment[]>([]);
-  const [observations, setObservations] = useState<ObservationItem[]>([]);
+  const [appointments, setAppointments] = useState<
+    PatientAppointment[]
+  >([]);
+  const [observations, setObservations] = useState<
+    ObservationItem[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [error, setError] = useState("");
@@ -137,43 +163,52 @@ export default function PatientDetailPage() {
     async function loadPatientDetails() {
       if (
         !accessToken ||
-        (profile !== "medico" && profile !== "cuidador-clinico") ||
+        (profile !== "medico" &&
+          profile !== "cuidador-clinico") ||
         !patientId
       ) {
+        setPatient(null);
+        setAppointments([]);
+        setObservations([]);
         setLoading(false);
         return;
       }
 
       setLoading(true);
       setError("");
+      setPatient(null);
+      setAppointments([]);
+      setObservations([]);
 
       try {
-        const profiles = await getAccessiblePatients(accessToken);
-        const selected = profiles.find(
-          (item) => getPatientId(item) === patientId,
+        const selected = await getPatientById(
+          accessToken,
+          patientId,
         );
 
-        if (!selected) {
-          if (!cancelled) {
-            setPatient(null);
-            setAppointments([]);
-            setObservations([]);
-          }
-          return;
-        }
+        if (cancelled) return;
 
         const patientItem = toPatientItem(selected);
 
-        const [appointmentResults, observationResults] =
-          await Promise.all([
-            getPatientAppointments(accessToken, patientId),
-            getPatientObservations(accessToken, patientId),
-          ]);
+        if (!patientItem.id) {
+          throw new Error(
+            "O cadastro retornado não possui um identificador válido.",
+          );
+        }
+
+        const [
+          appointmentResults,
+          observationResults,
+        ] = await Promise.all([
+          getPatientAppointments(accessToken, patientId),
+          getPatientObservations(accessToken, patientId),
+        ]);
 
         if (cancelled) return;
 
         setCurrentTime(Date.now());
         setPatient(patientItem);
+
         setAppointments(
           [...appointmentResults].sort((a, b) => {
             const dateA = a.data?.scheduledAt
@@ -182,9 +217,11 @@ export default function PatientDetailPage() {
             const dateB = b.data?.scheduledAt
               ? new Date(b.data.scheduledAt).getTime()
               : 0;
+
             return dateA - dateB;
           }),
         );
+
         setObservations(
           observationResults
             .map(toObservationItem)
@@ -195,6 +232,7 @@ export default function PatientDetailPage() {
               const dateB = b.createdAt
                 ? new Date(b.createdAt).getTime()
                 : 0;
+
               return dateB - dateA;
             })
             .slice(0, 5),
@@ -208,7 +246,9 @@ export default function PatientDetailPage() {
           );
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
@@ -231,7 +271,11 @@ export default function PatientDetailPage() {
   if (loading) {
     return (
       <div className="flex flex-col gap-6">
-        <PageHeader title="Paciente" subtitle="Carregando cadastro" />
+        <PageHeader
+          title="Paciente"
+          subtitle="Carregando cadastro"
+        />
+
         <GlassCard>
           <p className="text-sm text-ink-soft">
             Carregando dados do paciente...
@@ -245,6 +289,7 @@ export default function PatientDetailPage() {
     return (
       <div className="flex flex-col gap-6">
         <PageHeader title="Paciente" />
+
         {error && (
           <p
             role="alert"
@@ -253,15 +298,21 @@ export default function PatientDetailPage() {
             {error}
           </p>
         )}
+
         <GlassCard>
           <EmptyState
-            title={error ? "Não foi possível carregar o paciente" : "Paciente não encontrado"}
+            title={
+              error
+                ? "Não foi possível carregar o paciente"
+                : "Paciente não encontrado"
+            }
             description={
               error
-                ? "Verifique a conexão e tente novamente."
-                : "Ele pode não estar vinculado à sua conta."
+                ? "Verifique a conexão, suas permissões e tente novamente."
+                : "O cadastro pode não existir ou você pode não ter acesso a ele."
             }
           />
+
           <div className="mt-4 flex justify-center">
             <SmallButton to="/app/pacientes">
               Voltar para pacientes
@@ -274,16 +325,22 @@ export default function PatientDetailPage() {
 
   const upcoming = appointments.filter((item) => {
     const value = item.data?.scheduledAt;
-    if (!value || currentTime === 0) return false;
+
+    if (!value || currentTime === 0) {
+      return false;
+    }
 
     const date = new Date(value);
+
     return (
       !Number.isNaN(date.getTime()) &&
       date.getTime() >= currentTime
     );
   });
 
-  const observationItems = observations.filter((item) => item.notes.trim());
+  const observationItems = observations.filter((item) =>
+    item.notes.trim(),
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -302,7 +359,7 @@ export default function PatientDetailPage() {
       >
         <SmallButton
           variant="solid"
-          to={`/app/mensagens?paciente=${patientId}`}
+          to={`/app/mensagens?paciente=${encodeURIComponent(patientId)}`}
           label={`Contatar ${patient.name}`}
         >
           Contatar
@@ -321,30 +378,38 @@ export default function PatientDetailPage() {
       <div className="grid gap-6 xl:grid-cols-2">
         <GlassCard title="Dados pessoais">
           <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-            <Info label="Nome completo">{patient.name}</Info>
+            <Info label="Nome completo">
+              {patient.name}
+            </Info>
+
             <Info label="Data de nascimento">
               {formatDate(patient.birthDate)}
             </Info>
+
             <Info label="E-mail">
               {patient.email || "Não informado"}
             </Info>
+
             <Info label="Telefone">
               {patient.phone || "Não informado"}
             </Info>
           </dl>
         </GlassCard>
 
-        <GlassCard title="Acompanhamento">
+        <GlassCard title="Acompanhamento clínico">
           <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
             <Info label="Diagnóstico">
               {patient.diagnosis || "Não informado"}
             </Info>
+
             <Info label="Data do diagnóstico">
               {formatDate(patient.diagnosisDate)}
             </Info>
+
             <Info label="Estágio">
               {patient.stage || "Não informado"}
             </Info>
+
             <Info label="Cuidador vinculado">
               {patient.caregiver || "Não informado"}
             </Info>
@@ -359,7 +424,9 @@ export default function PatientDetailPage() {
               {patient.notes}
             </p>
           ) : (
-            <EmptyState title="Nenhuma observação cadastral registrada" />
+            <EmptyState
+              title="Nenhuma observação clínica registrada"
+            />
           )}
         </GlassCard>
 
@@ -373,7 +440,9 @@ export default function PatientDetailPage() {
                   key={item._id}
                   icon={CalendarIcon}
                   title={item.data?.title || "Consulta"}
-                  subtitle={`${formatDateTime(item.data?.scheduledAt)}${
+                  subtitle={`${formatDateTime(
+                    item.data?.scheduledAt,
+                  )}${
                     item.data?.location
                       ? ` · ${item.data.location}`
                       : ""
@@ -387,7 +456,9 @@ export default function PatientDetailPage() {
 
       <GlassCard title="Registros de evolução">
         {observationItems.length === 0 ? (
-          <EmptyState title="Nenhum registro de evolução encontrado" />
+          <EmptyState
+            title="Nenhum registro de evolução encontrado"
+          />
         ) : (
           <ul className="flex flex-col gap-3">
             {observationItems.map((item) => (
@@ -395,7 +466,9 @@ export default function PatientDetailPage() {
                 key={item.id}
                 icon={MessageIcon}
                 title={item.category}
-                subtitle={`${formatDateTime(item.createdAt)} · ${item.notes}`}
+                subtitle={`${formatDateTime(
+                  item.createdAt,
+                )} · ${item.notes}`}
               />
             ))}
           </ul>
