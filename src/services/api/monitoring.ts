@@ -91,16 +91,26 @@ export async function getMonitoringSummary(
   return result.data;
 }
 
+
 export async function getMonitoringHistory(
   accessToken: string,
   patientId: string,
   page = 1,
-  limit = 50,
+  limit = 100,
+  filters?: {
+    from?: string;
+    to?: string;
+    sensorType?: string;
+  },
 ): Promise<MonitoringHistory> {
   const query = new URLSearchParams({
     page: String(page),
     limit: String(limit),
   });
+
+  if (filters?.from) query.set("from", filters.from);
+  if (filters?.to) query.set("to", filters.to);
+  if (filters?.sensorType) query.set("sensorType", filters.sensorType);
 
   const result = await request<MonitoringRecord[]>(
     `/monitoring/patients/${encodeURIComponent(patientId)}?${query}`,

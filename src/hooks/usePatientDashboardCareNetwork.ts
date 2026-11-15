@@ -1,4 +1,3 @@
-
 import {
   useCallback,
   useEffect,
@@ -13,6 +12,7 @@ import {
   searchCareUser,
   inviteCaregiver,
   enableCaregiverCommunication,
+  enablePatientClinicalAccess,
   revokeCaregiverAccess,
 } from "../services/api/patients";
 
@@ -118,6 +118,9 @@ export default function usePatientDashboardCareNetwork(
   const [feedback, setFeedback] = useState<Feedback>(null);
 
   const [enablingCommunicationId, setEnablingCommunicationId] =
+    useState<string | null>(null);
+
+  const [enablingClinicalAccessId, setEnablingClinicalAccessId] =
     useState<string | null>(null);
 
   const [removingCaregiverId, setRemovingCaregiverId] =
@@ -363,6 +366,40 @@ export default function usePatientDashboardCareNetwork(
     }
   }
 
+  async function handleEnableClinicalAccess(linkId: string) {
+    if (!accessToken) {
+      setFeedback({
+        type: "error",
+        message: "Sua sessão expirou. Entre novamente para continuar.",
+      });
+      return;
+    }
+
+    setEnablingClinicalAccessId(linkId);
+    setFeedback(null);
+
+    try {
+      await enablePatientClinicalAccess(accessToken, linkId);
+
+      setFeedback({
+        type: "success",
+        message: "Acesso à evolução clínica habilitado.",
+      });
+
+      await loadCareNetwork();
+    } catch (err) {
+      setFeedback({
+        type: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Não foi possível habilitar o acesso clínico.",
+      });
+    } finally {
+      setEnablingClinicalAccessId(null);
+    }
+  }
+
   async function handleRevokeCaregiver(linkId: string) {
     if (!accessToken) {
       setFeedback({
@@ -444,5 +481,7 @@ export default function usePatientDashboardCareNetwork(
     handleEnableCommunication,
     removingCaregiverId,
     handleRevokeCaregiver,
+    enablingClinicalAccessId,
+    handleEnableClinicalAccess,
   };
 }

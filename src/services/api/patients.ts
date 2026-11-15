@@ -5,13 +5,13 @@ export type PatientProfile = {
   _id?: string;
   id?: string;
   userId?:
-    | string
-    | {
-        _id?: string;
-        id?: string;
-        fullName?: string;
-        email?: string;
-      };
+  | string
+  | {
+    _id?: string;
+    id?: string;
+    fullName?: string;
+    email?: string;
+  };
   clinicalProfile?: {
     diagnosisDate?: string;
     followUpNotes?: string;
@@ -326,19 +326,19 @@ export type PatientCareLink = {
   permissions?: string[];
   userId: string | CareNetworkUser;
   patientId?:
+  | string
+  | {
+    _id?: string;
+    id?: string;
+    userId?:
     | string
     | {
-        _id?: string;
-        id?: string;
-        userId?:
-          | string
-          | {
-              _id?: string;
-              id?: string;
-              fullName?: string;
-              email?: string;
-            };
-      };
+      _id?: string;
+      id?: string;
+      fullName?: string;
+      email?: string;
+    };
+  };
 };
 
 export type CareUser = {
@@ -384,13 +384,24 @@ export async function inviteCaregiver(
   const permissions =
     relationship === "HOME_CAREGIVER"
       ? [
+        "patient.profile.read",
+        "patient.events.read",
+        "patient.medications.read",
+        "patient.appointments.read",
+        "patient.exercises.read",
+      ]
+      : relationship === "PROFESSIONAL"
+        ? [
           "patient.profile.read",
+          "patient.monitoring.read",
           "patient.events.read",
           "patient.medications.read",
           "patient.appointments.read",
           "patient.exercises.read",
+          "patient.diary.read",
+          "patient.diary.write",
         ]
-      : [
+        : [
           "patient.profile.read",
           "patient.monitoring.read",
           "patient.events.read",
@@ -432,6 +443,17 @@ export async function enableCaregiverCommunication(
 ): Promise<PatientCareLink> {
   return mutate<PatientCareLink>(
     `/patient-links/${encodeURIComponent(linkId)}/enable-communication`,
+    accessToken,
+    "PATCH",
+  );
+}
+
+export async function enablePatientClinicalAccess(
+  accessToken: string,
+  linkId: string,
+): Promise<PatientCareLink> {
+  return mutate<PatientCareLink>(
+    `/patient-links/${encodeURIComponent(linkId)}/enable-clinical-access`,
     accessToken,
     "PATCH",
   );

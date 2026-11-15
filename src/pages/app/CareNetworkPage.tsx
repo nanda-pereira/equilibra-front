@@ -1,4 +1,3 @@
-
 import { useState, type ReactNode } from "react";
 import { Navigate } from "react-router";
 
@@ -70,6 +69,8 @@ export default function CareNetworkPage() {
     handleInvite,
     enablingCommunicationId,
     handleEnableCommunication,
+    enablingClinicalAccessId,
+    handleEnableClinicalAccess,
     removingCaregiverId,
     handleRevokeCaregiver,
   } = usePatientDashboardCareNetwork(
@@ -158,9 +159,7 @@ export default function CareNetworkPage() {
                   {error}
                 </p>
 
-                <SmallButton
-                  onClick={() => void loadCareNetwork()}
-                >
+                <SmallButton onClick={() => void loadCareNetwork()}>
                   Tentar novamente
                 </SmallButton>
               </div>
@@ -174,6 +173,32 @@ export default function CareNetworkPage() {
                 {activePeople.map((person) => {
                   const clinical =
                     person.relationship === "CLINICAL_CAREGIVER";
+
+                  const clinicalAccessEligible = [
+                    "PROFESSIONAL",
+                    "NEUROLOGIST",
+                  ].includes(person.relationship);
+
+                  const clinicalAccessEnabled =
+                    person.permissions?.includes("patient.diary.read") ===
+                      true &&
+                    person.permissions?.includes("patient.diary.write") ===
+                      true;
+
+                  const communicationEnabled =
+                    person.permissions?.includes(
+                      "patient.communication.read",
+                    ) === true &&
+                    person.permissions?.includes(
+                      "patient.communication.send",
+                    ) === true;
+
+                  const communicationEligible = [
+                    "PROFESSIONAL",
+                    "NEUROLOGIST",
+                    "HOME_CAREGIVER",
+                    "CLINICAL_CAREGIVER",
+                  ].includes(person.relationship);
 
                   return (
                     <li
@@ -203,14 +228,49 @@ export default function CareNetworkPage() {
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <StatusBadge
                             status="stable"
                             label={
-                              statusLabels[person.status] ??
-                              "Vínculo ativo"
+                              statusLabels[person.status] ?? "Vínculo ativo"
                             }
                           />
+
+                          {clinicalAccessEligible &&
+                            (clinicalAccessEnabled ? (
+                              <span className="rounded-full bg-success-bg px-3 py-1 text-xs font-medium text-success-text">
+                                Evolução clínica habilitada
+                              </span>
+                            ) : (
+                              <SmallButton
+                                variant="solid"
+                                onClick={() =>
+                                  void handleEnableClinicalAccess(
+                                    person.linkId,
+                                  )
+                                }
+                                disabled={Boolean(enablingClinicalAccessId)}
+                              >
+                                {enablingClinicalAccessId === person.linkId
+                                  ? "Habilitando..."
+                                  : "Habilitar evolução clínica"}
+                              </SmallButton>
+                            ))}
+
+                          {communicationEligible &&
+                            (communicationEnabled ? (
+                              <span className="rounded-full bg-success-bg px-3 py-1 text-xs font-medium text-success-text">
+                                Mensagens habilitadas
+                              </span>
+                            ) : (
+                              <SmallButton
+                                variant="solid"
+                                onClick={() => setConfirmId(person.linkId)}
+                                disabled={Boolean(enablingCommunicationId)}
+                              >
+                                Habilitar mensagens
+                              </SmallButton>
+                            ))}
 
                           <button
                             type="button"
@@ -281,9 +341,7 @@ export default function CareNetworkPage() {
                       <p className="truncate text-base font-medium text-ink">
                         {person.name}
                       </p>
-                      <p className="text-sm text-ink-soft">
-                        {person.role}
-                      </p>
+                      <p className="text-sm text-ink-soft">{person.role}</p>
                     </div>
 
                     <StatusBadge
@@ -371,9 +429,7 @@ export default function CareNetworkPage() {
                 <div className="flex items-center gap-3">
                   <Avatar
                     name={
-                      foundUser.fullName ??
-                      foundUser.email ??
-                      "Pessoa"
+                      foundUser.fullName ?? foundUser.email ?? "Pessoa"
                     }
                     tone="soft"
                     className="bg-white!"
@@ -390,7 +446,11 @@ export default function CareNetworkPage() {
 
                     <p className="mt-1 text-xs text-ink-soft">
                       {caregiverRole === "PROFESSIONAL"
-                        ? `Médico${foundUser.specialty ? ` · ${foundUser.specialty}` : ""}`
+                        ? `Médico${
+                            foundUser.specialty
+                              ? ` · ${foundUser.specialty}`
+                              : ""
+                          }`
                         : relationshipLabels[caregiverRole] ??
                           caregiverRole}
                     </p>
@@ -415,8 +475,8 @@ export default function CareNetworkPage() {
       </div>
 
       <Callout>
-        A comunicação por mensagens depende do seu consentimento: ela só é
-        liberada para um cuidador clínico depois que você a habilita aqui.
+        As mensagens só ficam disponíveis depois que você autoriza a comunicação
+        com vínculo ativo. A evolução clínica é uma permissão separada.
       </Callout>
 
       <Modal
@@ -427,17 +487,15 @@ export default function CareNetworkPage() {
         {confirming && (
           <div className="flex flex-col gap-5">
             <p className="text-base text-ink">
-              Ao habilitar, <strong>{confirming.name}</strong> poderá ler
-              e enviar mensagens na sua conversa dentro do Equilibra.
+              Ao habilitar, <strong>{confirming.name}</strong> poderá ler e
+              enviar mensagens na sua conversa dentro do Equilibra.
             </p>
 
             <div className="flex flex-wrap gap-3">
               <SmallButton
                 variant="solid"
                 onClick={() => void confirmEnable()}
-                disabled={
-                  enablingCommunicationId === confirming.linkId
-                }
+                disabled={enablingCommunicationId === confirming.linkId}
               >
                 {enablingCommunicationId === confirming.linkId
                   ? "Habilitando…"
@@ -465,9 +523,9 @@ export default function CareNetworkPage() {
         <div className="flex flex-col gap-5">
           <p className="text-base text-ink">
             Tem certeza de que deseja remover{" "}
-            <strong>{removeConfirmName}</strong> da sua rede de cuidado?
-            Essa pessoa perderá o acesso concedido por esse vínculo.
-            A conta e o histórico não serão apagados.
+            <strong>{removeConfirmName}</strong> da sua rede de cuidado? Essa
+            pessoa perderá o acesso concedido por esse vínculo. A conta e o
+            histórico não serão apagados.
           </p>
 
           <div className="flex flex-wrap gap-3">

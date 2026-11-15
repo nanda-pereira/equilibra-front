@@ -1,4 +1,3 @@
-
 import "./modules/app/preferences";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import AppLayout from "./components/app/AppLayout";
@@ -31,6 +30,8 @@ import AdminPage from "./pages/admin/AdminPage";
 import TermsOfUsePage from "./pages/legal/TermsOfUsePage";
 import PrivacyPolicyPage from "./pages/legal/PrivacyPolicyPage";
 
+import VerifyEmailPage from "./pages/auth/VerifyEmailPage";
+
 function AgendaRoute() {
   const { session } = useSession();
 
@@ -51,6 +52,7 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/cadastro" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/verificar-email" element={<VerifyEmailPage />} />
 
           <Route path="/termos-de-uso" element={<TermsOfUsePage />} />
           <Route
