@@ -93,6 +93,7 @@ export default function ProfileStep({
                 onChange={() => {
                   onChange(profile.value);
                   setShowError(false);
+                  onNext();
                 }}
                 className="sr-only"
               />

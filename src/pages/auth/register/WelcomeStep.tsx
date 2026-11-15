@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router";
 import Button from "../../../components/ui/Button";
 import StepHeading from "../../../components/ui/StepHeading";
@@ -18,24 +17,14 @@ export default function WelcomeStep({
   const navigate = useNavigate();
 
   const firstName = fullName.trim().split(/\s+/)[0] ?? "";
-  const hasDevelopmentToken = Boolean(
-    registrationResult?.emailVerificationDevToken,
-  );
 
   function handleStart() {
-    if (!registrationResult?.user?.email) return;
+    const email = registrationResult?.user?.email;
 
-    if (registrationResult.emailVerificationDevToken) {
-      const params = new URLSearchParams({
-        token: registrationResult.emailVerificationDevToken,
-      });
-
-      navigate(`/verificar-email?${params.toString()}`);
-      return;
-    }
+    if (!email) return;
 
     navigate("/login", {
-      state: { email: registrationResult.user.email },
+      state: { email },
     });
   }
 
@@ -44,11 +33,7 @@ export default function WelcomeStep({
       <StepHeading
         className="mt-16 md:mt-28"
         title={`Boas-vindas, ${firstName}!`}
-        description={
-          hasDevelopmentToken
-            ? "Sua conta foi criada. Vamos confirmar seu e-mail para liberar seu acesso ao Equilibra."
-            : "Sua conta foi criada. Confira sua caixa de entrada para confirmar seu e-mail e concluir o acesso."
-        }
+        description="Sua conta foi criada com sucesso. Você já pode entrar no Equilibra com seu e-mail e senha."
       />
 
       <Button
@@ -57,7 +42,7 @@ export default function WelcomeStep({
         onClick={handleStart}
         className="mt-14 w-[246px] gap-6! bg-action! hover:bg-action-hover!"
       >
-        {hasDevelopmentToken ? "Confirmar e-mail" : "Ir para entrar"}
+        Ir para entrar
       </Button>
     </div>
   );

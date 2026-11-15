@@ -32,6 +32,8 @@ export type RegisterResponseData = {
   accessToken?: string;
   refreshToken?: string;
   emailVerificationDevToken?: string;
+  emailVerificationRequired?: boolean;
+  message?: string;
 };
 
 type RegisterResponse = {

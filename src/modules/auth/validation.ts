@@ -6,7 +6,7 @@ export type PasswordRule = {
 
 // Rótulos conforme o Figma (4 regras).
 export const PASSWORD_RULES: PasswordRule[] = [
-  { id: "length", label: "8 ou mais caracteres", test: (v) => v.length >= 8 },
+  { id: "length", label: "12 ou mais caracteres", test: (v) => v.length >= 12 },
   { id: "upper", label: "Letra maiúscula", test: (v) => /\p{Lu}/u.test(v) },
   { id: "lower", label: "Letra minúscula", test: (v) => /\p{Ll}/u.test(v) },
   { id: "number", label: "Número", test: (v) => /\d/.test(v) },

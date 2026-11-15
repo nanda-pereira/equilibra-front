@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AuthLayout from "../../components/layout/AuthLayout";
 import Stepper from "../../components/ui/Stepper";
 import {
@@ -28,6 +27,18 @@ export default function RegisterPage() {
   const [registrationResult, setRegistrationResult] =
     useState<RegisterResponseData | null>(null);
 
+  const [isStepVisible, setIsStepVisible] = useState(false);
+
+  useEffect(() => {
+    setIsStepVisible(false);
+
+    const frame = requestAnimationFrame(() => {
+      setIsStepVisible(true);
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [step]);
+
   function updateField<K extends keyof RegisterData>(
     field: K,
     value: RegisterData[K],
@@ -35,38 +46,38 @@ export default function RegisterPage() {
     setData((prev) => ({ ...prev, [field]: value }));
   }
 
-  
-async function handleCreateAccount() {
-  if (!profile || submitting) return;
 
-  setSubmitting(true);
-  setSubmitError("");
+  async function handleCreateAccount() {
+    if (!profile || submitting) return;
 
-  try {
-    const result = await registerUser(profile, data);
-    setRegistrationResult(result);
+    setSubmitting(true);
+    setSubmitError("");
 
-    // A senha não precisa continuar na memória depois do cadastro.
-    setData((prev) => ({
-      ...prev,
-      password: "",
-      confirmPassword: "",
-    }));
+    try {
+      const result = await registerUser(profile, data);
+      setRegistrationResult(result);
 
-    setStep(3);
-  } catch (error) {
-    setSubmitError(
-      error instanceof ApiError
-        ? error.message
-        : "Não foi possível criar a conta agora. Tente novamente.",
-    );
-  } finally {
-    setSubmitting(false);
+      // A senha não precisa continuar na memória depois do cadastro.
+      setData((prev) => ({
+        ...prev,
+        password: "",
+        confirmPassword: "",
+      }));
+
+      setStep(3);
+    } catch (error) {
+      setSubmitError(
+        error instanceof ApiError
+          ? error.message
+          : "Não foi possível criar a conta agora. Tente novamente.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
-}
 
   return (
-    // background: "figma" (reprodução do print) ou "design-system" (o meu)
+    // background: "figma" ou "design-system" -> com linhas e mais elementos no fundo
     <AuthLayout background="figma">
       <div className="flex flex-col items-center">
         <Stepper steps={REGISTER_STEPS} current={step} />
@@ -75,7 +86,12 @@ async function handleCreateAccount() {
         </p>
       </div>
 
-      <div className="flex flex-col lg:min-h-[600px]">
+      <div
+        className={`flex flex-col transition-all duration-300 ease-out motion-reduce:transition-none lg:min-h-[600px] ${isStepVisible
+            ? "translate-y-0 opacity-100"
+            : "translate-y-2 opacity-0"
+          }`}
+      >
         {step === 0 && (
           <ProfileStep
             value={profile}
