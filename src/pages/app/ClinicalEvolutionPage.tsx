@@ -1,10 +1,9 @@
-
 import { useEffect, useState, type FormEvent } from "react";
 import { Navigate } from "react-router";
 import EmptyState from "../../components/app/EmptyState";
 import GlassCard from "../../components/app/GlassCard";
 import ListRow from "../../components/app/ListRow";
-import Modal from "../../components/app/Modal";
+import Modal, { useModalDialog } from "../../components/app/Modal";
 import PageHeader from "../../components/app/PageHeader";
 import SmallButton from "../../components/app/SmallButton";
 import Select from "../../components/ui/Select";
@@ -34,6 +33,26 @@ type ObservationItem = {
   createdAt?: string;
 };
 
+type ObservationErrors = {
+  patient?: string;
+  text?: string;
+};
+
+type NewObservationFormProps = {
+  patients: PatientOption[];
+  patient: string;
+  setPatient: (value: string) => void;
+  category: string;
+  setCategory: (value: string) => void;
+  text: string;
+  setText: (value: string) => void;
+  submitted: boolean;
+  errors: ObservationErrors;
+  saving: boolean;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onCancel: () => void;
+};
+
 const CATEGORIES = [
   "Evolução clínica",
   "Observação",
@@ -52,6 +71,7 @@ function toPatientOption(
   patient: PatientProfile,
 ): PatientOption | null {
   const id = patient.id ?? patient._id;
+
   if (!id) return null;
 
   const user = patient.userId;
@@ -85,9 +105,80 @@ function formatDate(value?: string) {
   if (!value) return "Data não informada";
 
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Data não informada";
+
+  if (Number.isNaN(date.getTime())) {
+    return "Data não informada";
+  }
 
   return DATE_FORMAT.format(date);
+}
+
+/**
+ * Formulário separado para acessar o contexto do modal.
+ * Assim, os menus dos selects podem ser renderizados dentro
+ * da camada superior do dialog, sem aparecer atrás dele.
+ */
+function NewObservationForm({
+  patients,
+  patient,
+  setPatient,
+  category,
+  setCategory,
+  text,
+  setText,
+  submitted,
+  errors,
+  saving,
+  onSubmit,
+  onCancel,
+}: NewObservationFormProps) {
+  const dialog = useModalDialog();
+
+  return (
+    <form noValidate onSubmit={onSubmit}>
+      <Select
+        label="Paciente"
+        options={patients.map((item) => ({
+          label: item.name,
+          value: item.id,
+        }))}
+        value={patient}
+        onChange={(event) => setPatient(event.target.value)}
+        error={submitted ? errors.patient : undefined}
+        placeholder="Selecione um paciente"
+        portalContainer={dialog}
+      />
+
+      <Select
+        label="Categoria"
+        options={CATEGORIES}
+        value={category}
+        onChange={(event) => setCategory(event.target.value)}
+        portalContainer={dialog}
+      />
+
+      <Textarea
+        label="Registro"
+        placeholder="Descreva o acompanhamento clínico"
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        error={submitted ? errors.text : undefined}
+      />
+
+      <div className="flex flex-wrap gap-3">
+        <SmallButton type="submit" variant="solid">
+          {saving ? "Salvando..." : "Salvar registro"}
+        </SmallButton>
+
+        <SmallButton
+          onClick={onCancel}
+          disabled={saving}
+        >
+          Cancelar
+        </SmallButton>
+      </div>
+    </form>
+  );
 }
 
 export default function ClinicalEvolutionPage() {
@@ -126,9 +217,12 @@ export default function ClinicalEvolutionPage() {
 
       try {
         const profiles = await getAccessiblePatients(accessToken);
+
         const patientOptions = profiles
           .map(toPatientOption)
-          .filter((item): item is PatientOption => item !== null);
+          .filter(
+            (item): item is PatientOption => item !== null,
+          );
 
         const results = await Promise.all(
           patientOptions.map((item) =>
@@ -138,7 +232,9 @@ export default function ClinicalEvolutionPage() {
 
         const observations = results
           .flat()
-          .map((record) => toObservationItem(record, patientOptions))
+          .map((record) =>
+            toObservationItem(record, patientOptions),
+          )
           .sort((a, b) => {
             const dateA = a.createdAt
               ? new Date(a.createdAt).getTime()
@@ -146,6 +242,7 @@ export default function ClinicalEvolutionPage() {
             const dateB = b.createdAt
               ? new Date(b.createdAt).getTime()
               : 0;
+
             return dateB - dateA;
           });
 
@@ -153,6 +250,7 @@ export default function ClinicalEvolutionPage() {
 
         setPatients(patientOptions);
         setRecords(observations);
+
         setPatient((current) =>
           patientOptions.some((item) => item.id === current)
             ? current
@@ -187,10 +285,14 @@ export default function ClinicalEvolutionPage() {
   const visibleRecords =
     filter === "all"
       ? records
-      : records.filter((record) => record.patientId === filter);
+      : records.filter(
+        (record) => record.patientId === filter,
+      );
 
-  const errors = {
-    patient: patient ? undefined : "Selecione um paciente",
+  const errors: ObservationErrors = {
+    patient: patient
+      ? undefined
+      : "Selecione um paciente",
     text:
       text.trim().length < 5
         ? "Escreva ao menos algumas palavras"
@@ -207,11 +309,14 @@ export default function ClinicalEvolutionPage() {
     setOpen(true);
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
     setSubmitted(true);
 
     if (errors.patient || errors.text) return;
+
     if (!accessToken) {
       setError("Sua sessão expirou. Entre novamente.");
       return;
@@ -222,7 +327,9 @@ export default function ClinicalEvolutionPage() {
     );
 
     if (!selectedPatient) {
-      setError("Não foi possível identificar o paciente selecionado.");
+      setError(
+        "Não foi possível identificar o paciente selecionado.",
+      );
       return;
     }
 
@@ -231,10 +338,14 @@ export default function ClinicalEvolutionPage() {
     setFlash("");
 
     try {
-      await createPatientObservation(accessToken, patient, {
-        category,
-        notes: text.trim(),
-      });
+      await createPatientObservation(
+        accessToken,
+        patient,
+        {
+          category,
+          notes: text.trim(),
+        },
+      );
 
       setOpen(false);
       setFlash("Registro clínico salvo com sucesso.");
@@ -255,6 +366,7 @@ export default function ClinicalEvolutionPage() {
           const dateB = b.createdAt
             ? new Date(b.createdAt).getTime()
             : 0;
+
           return dateB - dateA;
         });
 
@@ -303,26 +415,19 @@ export default function ClinicalEvolutionPage() {
       )}
 
       <GlassCard title="Filtrar por paciente">
-        <div className="max-w-md">
-          <label
-            htmlFor="clinical-evolution-filter"
-            className="mb-2 block text-sm font-medium text-ink"
-          >
-            Paciente
-          </label>
-          <select
-            id="clinical-evolution-filter"
+        <div className="w-full max-w-md">
+          <Select
+            label="Paciente"
+            options={[
+              { label: "Todos os pacientes", value: "all" },
+              ...patients.map((item) => ({
+                label: item.name,
+                value: item.id,
+              })),
+            ]}
             value={filter}
             onChange={(event) => setFilter(event.target.value)}
-            className="h-14 w-full rounded-full border border-field-border bg-white px-5 text-sm outline-none focus:border-action"
-          >
-            <option value="all">Todos os pacientes</option>
-            {patients.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
+          />
         </div>
       </GlassCard>
 
@@ -354,46 +459,22 @@ export default function ClinicalEvolutionPage() {
           if (!saving) setOpen(false);
         }}
       >
-        <form noValidate onSubmit={handleSubmit}>
-          <Select
-            label="Paciente"
-            options={patients.map((item) => item.name)}
-            value={
-              patients.find((item) => item.id === patient)?.name ?? ""
-            }
-            onChange={(event) => {
-              const selectedPatient = patients.find(
-                (item) => item.name === event.target.value,
-              );
-              setPatient(selectedPatient?.id ?? "");
-            }}
-            error={submitted ? errors.patient : undefined}
-          />
-
-          <Select
-            label="Categoria"
-            options={CATEGORIES}
-            value={category}
-            onChange={(event) => setCategory(event.target.value)}
-          />
-
-          <Textarea
-            label="Registro"
-            placeholder="Descreva o acompanhamento clínico"
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            error={submitted ? errors.text : undefined}
-          />
-
-          <div className="flex flex-wrap gap-3">
-            <SmallButton type="submit" variant="solid">
-              {saving ? "Salvando..." : "Salvar registro"}
-            </SmallButton>
-            <SmallButton onClick={() => setOpen(false)}>
-              Cancelar
-            </SmallButton>
-          </div>
-        </form>
+        <NewObservationForm
+          patients={patients}
+          patient={patient}
+          setPatient={setPatient}
+          category={category}
+          setCategory={setCategory}
+          text={text}
+          setText={setText}
+          submitted={submitted}
+          errors={errors}
+          saving={saving}
+          onSubmit={handleSubmit}
+          onCancel={() => {
+            if (!saving) setOpen(false);
+          }}
+        />
       </Modal>
     </div>
   );

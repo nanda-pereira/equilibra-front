@@ -105,9 +105,9 @@ function isWithinPeriod(
 ): boolean {
   return Boolean(
     date &&
-      !Number.isNaN(date.getTime()) &&
-      date >= startDate &&
-      date <= endDate,
+    !Number.isNaN(date.getTime()) &&
+    date >= startDate &&
+    date <= endDate,
   );
 }
 
@@ -349,57 +349,57 @@ export default function ReportsPage() {
         .replace(/^-|-$/g, "")
         .toLowerCase()}.csv`,
       [
-      ["Relatório do Equilibra", selectedPatient.name, period.label],
-      [],
-      ["Consultas", "Data e horário", "Título", "Situação", "Observações"],
-      ...filteredAppointments.map((item) => {
-        const scheduledAt = item.data.scheduledAt;
-        const date = scheduledAt
-          ? new Date(scheduledAt)
-          : getRecordDate(item);
+        ["Relatório do Equilibra", selectedPatient.name, period.label],
+        [],
+        ["Consultas", "Data e horário", "Título", "Situação", "Observações"],
+        ...filteredAppointments.map((item) => {
+          const scheduledAt = item.data.scheduledAt;
+          const date = scheduledAt
+            ? new Date(scheduledAt)
+            : getRecordDate(item);
 
-        const status = date
-          ? date.getTime() < exportTime
-            ? "Já ocorreu"
-            : "Agendada"
-          : item.status;
+          const status = date
+            ? date.getTime() < exportTime
+              ? "Já ocorreu"
+              : "Agendada"
+            : item.status;
 
-        return [
+          return [
+            "",
+            scheduledAt
+              ? formatDateTime(scheduledAt)
+              : date
+                ? formatDate(date.toISOString())
+                : "Data não informada",
+            item.data.title,
+            status,
+            item.data.notes ?? "",
+          ];
+        }),
+        [],
+        ["Registros de evolução", "Data", "Categoria", "Observação"],
+        ...filteredObservations.map((item) => [
           "",
-          scheduledAt
-            ? formatDateTime(scheduledAt)
-            : date
-              ? formatDate(date.toISOString())
-              : "Data não informada",
-          item.data.title,
-          status,
-          item.data.notes ?? "",
-        ];
-      }),
-      [],
-      ["Registros de evolução", "Data", "Categoria", "Observação"],
-      ...filteredObservations.map((item) => [
-        "",
-        formatDate(getRecordDate(item)?.toISOString()),
-        item.data.category,
-        item.data.notes,
-      ]),
-      [],
-      ["Medicamentos", "Dose prescrita", "Via", "Instruções"],
-      ...(medications?.prescriptions ?? []).map((item) => [
-        medications?.medications.find(
-          (medication) => medication._id === item.data.medicationId,
-        )?.data.name ?? "Medicamento",
-        `${item.data.dose} ${item.data.unit}`,
-        item.data.route,
-        item.data.instructions ?? "",
-      ]),
-      [],
-      ["Registros de medicação no período", String(medicationLogs.length)],
-    ]);
+          formatDate(getRecordDate(item)?.toISOString()),
+          item.data.category,
+          item.data.notes,
+        ]),
+        [],
+        ["Medicamentos", "Dose prescrita", "Via", "Instruções"],
+        ...(medications?.prescriptions ?? []).map((item) => [
+          medications?.medications.find(
+            (medication) => medication._id === item.data.medicationId,
+          )?.data.name ?? "Medicamento",
+          `${item.data.dose} ${item.data.unit}`,
+          item.data.route,
+          item.data.instructions ?? "",
+        ]),
+        [],
+        ["Registros de medicação no período", String(medicationLogs.length)],
+      ]);
   }
 
-    function exportPdf() {
+  function exportPdf() {
     if (!selectedPatient) return;
 
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
@@ -553,12 +553,12 @@ export default function ReportsPage() {
     }
 
     doc.save(
-    `relatorio-${selectedPatient.name
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-      .toLowerCase()}.pdf`,
+      `relatorio-${selectedPatient.name
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .toLowerCase()}.pdf`,
     );
   }
 
@@ -568,35 +568,34 @@ export default function ReportsPage() {
         title="Relatórios"
         subtitle="Resumo por paciente e período"
       >
-      <div className="flex flex-wrap gap-2">
-        <SmallButton onClick={exportCsv}>
-          <span className="inline-flex items-center gap-2">
-            <Icon icon={DownloadIcon} size={18} />
-            Exportar CSV
-          </span>
-        </SmallButton>
+        <div className="flex flex-wrap gap-2">
+          <SmallButton onClick={exportCsv}>
+            <span className="inline-flex items-center gap-2">
+              <Icon icon={DownloadIcon} size={18} />
+              Exportar CSV
+            </span>
+          </SmallButton>
 
-        <SmallButton onClick={exportPdf}>
-          <span className="inline-flex items-center gap-2">
-            <Icon icon={DownloadIcon} size={18} />
-            Exportar PDF
-          </span>
-        </SmallButton>
-      </div>
+          <SmallButton onClick={exportPdf}>
+            <span className="inline-flex items-center gap-2">
+              <Icon icon={DownloadIcon} size={18} />
+              Exportar PDF
+            </span>
+          </SmallButton>
+        </div>
       </PageHeader>
 
       <GlassCard title="Filtros">
         <div className="grid gap-x-6 sm:grid-cols-2">
           <Select
             label="Paciente"
-            options={patients.map((patient) => patient.name)}
-            value={selectedPatient?.name ?? ""}
+            options={patients.map((patient) => ({
+              label: patient.name,
+              value: patient.id,
+            }))}
+            value={patientId}
             onChange={(event) => {
-              const selected = patients.find(
-                (patient) => patient.name === event.target.value,
-              );
-
-              const nextPatientId = selected?.id ?? "";
+              const nextPatientId = event.target.value;
 
               setPatientId(nextPatientId);
 
@@ -611,7 +610,10 @@ export default function ReportsPage() {
 
           <Select
             label="Período"
-            options={PERIODS.map((item) => item.label)}
+            options={PERIODS.map((item) => ({
+              label: item.label,
+              value: item.label,
+            }))}
             value={periodLabel}
             onChange={(event) => setPeriodLabel(event.target.value)}
           />

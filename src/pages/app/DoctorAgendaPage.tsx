@@ -5,11 +5,12 @@ import EmptyState from "../../components/app/EmptyState";
 import GlassCard from "../../components/app/GlassCard";
 import ListRow from "../../components/app/ListRow";
 import MetricCard from "../../components/app/MetricCard";
-import Modal from "../../components/app/Modal";
+import Modal, {
+  useModalDialog,
+} from "../../components/app/Modal";
 import MonthCalendar from "../../components/app/MonthCalendar";
 import PageHeader from "../../components/app/PageHeader";
 import SmallButton from "../../components/app/SmallButton";
-import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
 import {
   CalendarIcon,
@@ -24,6 +25,8 @@ import {
   type PatientProfile,
 } from "../../services/api/patients";
 import { useSession } from "../../modules/session/session";
+import TimePicker from "../../components/ui/TimePicker";
+import DatePicker from "../../components/ui/DatePicker";
 
 type PatientOption = {
   id: string;
@@ -46,9 +49,18 @@ type AgendaData = {
 };
 
 const TYPES = [
-  "Consulta de acompanhamento",
-  "Consulta de retorno",
-  "Primeira consulta",
+  {
+    label: "Primeira consulta",
+    value: "Primeira consulta",
+  },
+  {
+    label: "Consulta de acompanhamento",
+    value: "Consulta de acompanhamento",
+  },
+  {
+    label: "Consulta de retorno",
+    value: "Consulta de retorno",
+  },
 ];
 
 const LONG_FORMAT = new Intl.DateTimeFormat("pt-BR", {
@@ -90,18 +102,24 @@ function byDateAndTime(a: AgendaItem, b: AgendaItem) {
   );
 }
 
-function toPatientOption(patient: PatientProfile): PatientOption | null {
+function toPatientOption(
+  patient: PatientProfile,
+): PatientOption | null {
   const id = patient.id ?? patient._id;
 
   if (!id) return null;
 
   const user = patient.userId;
+
   const name =
     typeof user === "object" && user !== null
       ? user.fullName || user.email
       : undefined;
 
-  return { id, name: name || "Paciente" };
+  return {
+    id,
+    name: name || "Paciente",
+  };
 }
 
 function toAgendaItem(
@@ -120,7 +138,10 @@ function toAgendaItem(
   const patient = patients.find(
     (item) => item.id === appointment.patientId,
   );
-  const title = appointment.data?.title || "Consulta";
+
+  const appointmentTitle =
+    appointment.data?.title || "Consulta";
+
   const location = appointment.data?.location;
   const notes = appointment.data?.notes;
 
@@ -129,20 +150,26 @@ function toAgendaItem(
     patientId: appointment.patientId,
     date,
     time: TIME_FORMAT.format(date),
-    kind: /exerc[ií]cio|atividade/i.test(title)
+    kind: /exerc[ií]cio|atividade/i.test(appointmentTitle)
       ? "exercicio"
       : "consulta",
-    title: patient?.name || title,
-    detail: [title, location, notes].filter(Boolean).join(" · "),
+    title: patient?.name || "Paciente",
+    detail: [appointmentTitle, location, notes]
+      .filter(Boolean)
+      .join(" · "),
   };
 }
 
-async function fetchAgenda(token: string): Promise<AgendaData> {
+async function fetchAgenda(
+  token: string,
+): Promise<AgendaData> {
   const patientProfiles = await getAccessiblePatients(token);
 
   const patients = patientProfiles
     .map(toPatientOption)
-    .filter((item): item is PatientOption => item !== null);
+    .filter(
+      (item): item is PatientOption => item !== null,
+    );
 
   const appointmentResults = await Promise.all(
     patients.map((item) =>
@@ -152,9 +179,15 @@ async function fetchAgenda(token: string): Promise<AgendaData> {
 
   const items = appointmentResults
     .flat()
-    .filter((appointment) => appointment.status !== "CANCELLED")
-    .map((appointment) => toAgendaItem(appointment, patients))
-    .filter((item): item is AgendaItem => item !== null)
+    .filter(
+      (appointment) => appointment.status !== "CANCELLED",
+    )
+    .map((appointment) =>
+      toAgendaItem(appointment, patients),
+    )
+    .filter(
+      (item): item is AgendaItem => item !== null,
+    )
     .sort(byDateAndTime);
 
   return { patients, items };
@@ -174,7 +207,7 @@ export default function DoctorAgendaPage() {
   const [patient, setPatient] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
-  const [type, setType] = useState(TYPES[0]);
+  const [type, setType] = useState(TYPES[0].value);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState("");
@@ -185,37 +218,30 @@ export default function DoctorAgendaPage() {
     let cancelled = false;
 
     if (!accessToken) {
-      const clearAgenda = async () => {
-        await Promise.resolve();
-
-        if (cancelled) return;
-
-        setLoading(false);
-        setAllItems([]);
-        setPatients([]);
-        setPatient("");
-      };
-
-      void clearAgenda();
-
-      return () => {
-        cancelled = true;
-      };
+      setLoading(false);
+      setAllItems([]);
+      setPatients([]);
+      setPatient("");
+      return;
     }
 
-    const load = async () => {
+    async function load() {
+      setLoading(true);
+
       try {
-        const result = await fetchAgenda(accessToken);
+        const result = await fetchAgenda(accessToken!);
 
         if (cancelled) return;
 
         setPatients(result.patients);
         setAllItems(result.items);
+
         setPatient((current) =>
           result.patients.some((item) => item.id === current)
             ? current
             : result.patients[0]?.id ?? "",
         );
+
         setError("");
       } catch (err) {
         if (!cancelled) {
@@ -230,7 +256,7 @@ export default function DoctorAgendaPage() {
           setLoading(false);
         }
       }
-    };
+    }
 
     void load();
 
@@ -242,7 +268,9 @@ export default function DoctorAgendaPage() {
   const items =
     patientFilter === "all"
       ? allItems
-      : allItems.filter((item) => item.patientId === patientFilter);
+      : allItems.filter(
+          (item) => item.patientId === patientFilter,
+        );
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -257,7 +285,8 @@ export default function DoctorAgendaPage() {
 
   const weekCount = items.filter(
     (item) =>
-      item.date >= startOfToday && item.date <= endOfWeek,
+      item.date >= startOfToday &&
+      item.date <= endOfWeek,
   ).length;
 
   const upcoming = items
@@ -276,6 +305,7 @@ export default function DoctorAgendaPage() {
 
   const firstHour = Math.min(8, ...dayHours);
   const lastHour = Math.max(18, ...dayHours);
+
   const hours = Array.from(
     { length: lastHour - firstHour + 1 },
     (_, index) => firstHour + index,
@@ -283,49 +313,65 @@ export default function DoctorAgendaPage() {
 
   const selectedText = LONG_FORMAT.format(selected);
   const selectedTitle =
-    selectedText.charAt(0).toUpperCase() + selectedText.slice(1);
+    selectedText.charAt(0).toUpperCase() +
+    selectedText.slice(1);
 
   const todayISO = toDateInput(new Date());
 
   const errors = {
-    patient: patient ? undefined : "Selecione um paciente",
+    patient: patient
+      ? undefined
+      : "Selecione um paciente",
     date: !date
       ? "Campo obrigatório"
       : date < todayISO
         ? "A data não pode ser anterior a hoje"
         : undefined,
-    time: !time ? "Campo obrigatório" : undefined,
+    time: !time
+      ? "Campo obrigatório"
+      : undefined,
   };
 
   function startNew() {
     setPatient(patients[0]?.id ?? "");
+
     setDate(
       toDateInput(selected) < todayISO
         ? todayISO
         : toDateInput(selected),
     );
+
     setTime("");
-    setType(TYPES[0]);
+    setType(TYPES[0].value);
     setSubmitted(false);
+    setError("");
     setFlash("");
     setOpen(true);
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
     setSubmitted(true);
 
-    if (errors.patient || errors.date || errors.time) return;
+    if (errors.patient || errors.date || errors.time) {
+      return;
+    }
 
     if (!accessToken) {
       setError("Sua sessão expirou. Entre novamente.");
       return;
     }
 
-    const selectedPatient = patients.find((item) => item.id === patient);
+    const selectedPatient = patients.find(
+      (item) => item.id === patient,
+    );
 
     if (!selectedPatient) {
-      setError("Não foi possível identificar o paciente selecionado.");
+      setError(
+        "Não foi possível identificar o paciente selecionado.",
+      );
       return;
     }
 
@@ -343,7 +389,9 @@ export default function DoctorAgendaPage() {
     );
 
     if (hasConflict) {
-      setError("Esse paciente já possui um compromisso nesse horário.");
+      setError(
+        "Esse paciente já possui um compromisso nesse horário.",
+      );
       return;
     }
 
@@ -352,14 +400,19 @@ export default function DoctorAgendaPage() {
     setFlash("");
 
     try {
-      await createPatientAppointment(accessToken, patient, {
-        title: type,
-        scheduledAt: scheduledDate.toISOString(),
-        durationMinutes: 30,
-      });
+      await createPatientAppointment(
+        accessToken,
+        patient,
+        {
+          title: type,
+          scheduledAt: scheduledDate.toISOString(),
+          durationMinutes: 30,
+        },
+      );
 
       setSelected(scheduledDate);
       setOpen(false);
+
       setFlash(
         `Consulta de ${selectedPatient.name} agendada para ${LONG_FORMAT.format(scheduledDate)} às ${TIME_FORMAT.format(scheduledDate)}.`,
       );
@@ -368,6 +421,7 @@ export default function DoctorAgendaPage() {
 
       setPatients(result.patients);
       setAllItems(result.items);
+
       setPatient((current) =>
         result.patients.some((item) => item.id === current)
           ? current
@@ -388,7 +442,10 @@ export default function DoctorAgendaPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Agenda" subtitle="Suas consultas">
+      <PageHeader
+        title="Agenda"
+        subtitle="Suas consultas"
+      >
         <SmallButton variant="solid" onClick={startNew}>
           Nova consulta
         </SmallButton>
@@ -418,16 +475,24 @@ export default function DoctorAgendaPage() {
           label="Consultas hoje"
           value={loading ? "—" : String(todayCount)}
         />
+
         <MetricCard
           icon={CalendarIcon}
           label="Próximos 7 dias"
           value={loading ? "—" : String(weekCount)}
           note={weekCount === 1 ? "consulta" : "consultas"}
         />
+
         <MetricCard
           icon={PatientsIcon}
           label="Próxima consulta"
-          value={loading ? "—" : next ? DAY_FORMAT.format(next.date) : "—"}
+          value={
+            loading
+              ? "—"
+              : next
+                ? DAY_FORMAT.format(next.date)
+                : "—"
+          }
           note={
             next
               ? `${next.time} · ${next.title}`
@@ -438,25 +503,21 @@ export default function DoctorAgendaPage() {
 
       <GlassCard title="Filtrar por paciente">
         <div className="max-w-md">
-          <label
-            htmlFor="doctor-agenda-patient-filter"
-            className="mb-2 block text-sm font-medium text-ink"
-          >
-            Paciente
-          </label>
-          <select
-            id="doctor-agenda-patient-filter"
+          <Select
+            label="Paciente"
+            options={[
+              { label: "Todos os pacientes", value: "all" },
+              ...patients.map((item) => ({
+                label: item.name,
+                value: item.id,
+              })),
+            ]}
             value={patientFilter}
-            onChange={(event) => setPatientFilter(event.target.value)}
-            className="h-14 w-full rounded-full border border-field-border bg-white px-5 text-sm outline-none focus:border-action"
-          >
-            <option value="all">Todos os pacientes</option>
-            {patients.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
+            onChange={(event) =>
+              setPatientFilter(event.target.value)
+            }
+            placeholder="Selecione um paciente"
+          />
         </div>
       </GlassCard>
 
@@ -470,9 +531,14 @@ export default function DoctorAgendaPage() {
           />
         </GlassCard>
 
-        <GlassCard title={selectedTitle} description="Agenda do dia">
+        <GlassCard
+          title={selectedTitle}
+          description="Agenda do dia"
+        >
           {loading ? (
-            <p className="text-sm text-ink-soft">Carregando agenda...</p>
+            <p className="text-sm text-ink-soft">
+              Carregando agenda...
+            </p>
           ) : dayItems.length === 0 ? (
             <EmptyState title="Nenhuma consulta neste dia" />
           ) : (
@@ -483,7 +549,8 @@ export default function DoctorAgendaPage() {
               {hours.map((hour) => {
                 const rowItems = dayItems.filter(
                   (item) =>
-                    Number.parseInt(item.time.slice(0, 2), 10) === hour,
+                    Number.parseInt(item.time.slice(0, 2), 10) ===
+                    hour,
                 );
 
                 return (
@@ -523,6 +590,7 @@ export default function DoctorAgendaPage() {
                             >
                               Ver paciente
                             </SmallButton>
+
                             <SmallButton
                               variant="solid"
                               to={`/app/mensagens?paciente=${item.patientId}`}
@@ -544,7 +612,9 @@ export default function DoctorAgendaPage() {
 
       <GlassCard title="Próximas consultas">
         {loading ? (
-          <p className="text-sm text-ink-soft">Carregando agenda...</p>
+          <p className="text-sm text-ink-soft">
+            Carregando agenda...
+          </p>
         ) : upcoming.length === 0 ? (
           <EmptyState title="Nenhuma consulta prevista" />
         ) : (
@@ -576,55 +646,128 @@ export default function DoctorAgendaPage() {
           if (!saving) setOpen(false);
         }}
       >
-        <form noValidate onSubmit={handleSubmit}>
-          <Select
-            label="Paciente"
-            options={patients.map((item) => item.name)}
-            value={patients.find((item) => item.id === patient)?.name ?? ""}
-            onChange={(event) => {
-              const selectedOption = patients.find(
-                (item) => item.name === event.target.value,
-              );
-              setPatient(selectedOption?.id ?? "");
-            }}
-            error={submitted ? errors.patient : undefined}
-          />
-
-          <div className="grid gap-x-6 sm:grid-cols-2">
-            <Input
-              label="Data"
-              type="date"
-              min={todayISO}
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-              error={submitted ? errors.date : undefined}
-            />
-            <Input
-              label="Horário"
-              type="time"
-              value={time}
-              onChange={(event) => setTime(event.target.value)}
-              error={submitted ? errors.time : undefined}
-            />
-          </div>
-
-          <Select
-            label="Tipo"
-            options={TYPES}
-            value={type}
-            onChange={(event) => setType(event.target.value)}
-          />
-
-          <div className="mt-2 flex flex-wrap gap-3">
-            <SmallButton type="submit" variant="solid">
-              {saving ? "Agendando..." : "Agendar consulta"}
-            </SmallButton>
-            <SmallButton onClick={() => setOpen(false)}>
-              Cancelar
-            </SmallButton>
-          </div>
-        </form>
+        <NewAppointmentForm
+          patients={patients}
+          patient={patient}
+          setPatient={setPatient}
+          date={date}
+          setDate={setDate}
+          time={time}
+          setTime={setTime}
+          type={type}
+          setType={setType}
+          types={TYPES}
+          todayISO={todayISO}
+          submitted={submitted}
+          errors={errors}
+          saving={saving}
+          onSubmit={handleSubmit}
+          onCancel={() => {
+            if (!saving) setOpen(false);
+          }}
+        />
       </Modal>
     </div>
+  );
+}
+
+type NewAppointmentFormProps = {
+  patients: PatientOption[];
+  patient: string;
+  setPatient: (value: string) => void;
+  date: string;
+  setDate: (value: string) => void;
+  time: string;
+  setTime: (value: string) => void;
+  type: string;
+  setType: (value: string) => void;
+  types: { label: string; value: string }[];
+  todayISO: string;
+  submitted: boolean;
+  errors: {
+    patient?: string;
+    date?: string;
+    time?: string;
+  };
+  saving: boolean;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onCancel: () => void;
+};
+
+function NewAppointmentForm({
+  patients,
+  patient,
+  setPatient,
+  date,
+  setDate,
+  time,
+  setTime,
+  type,
+  setType,
+  types,
+  todayISO,
+  submitted,
+  errors,
+  saving,
+  onSubmit,
+  onCancel,
+}: NewAppointmentFormProps) {
+  const dialog = useModalDialog();
+
+  return (
+    <form
+      noValidate
+      onSubmit={onSubmit}
+      className="flex flex-col gap-3 sm:gap-4"
+    >
+      <Select
+        label="Paciente"
+        options={patients.map((item) => ({
+          label: item.name,
+          value: item.id,
+        }))}
+        value={patient}
+        onChange={(event) => setPatient(event.target.value)}
+        placeholder="Selecione um paciente"
+        error={submitted ? errors.patient : undefined}
+        portalContainer={dialog}
+      />
+
+      <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+        <DatePicker
+          label="Data"
+          min={todayISO}
+          value={date}
+          onChange={setDate}
+          error={submitted ? errors.date : undefined}
+        />
+
+        <TimePicker
+          label="Horário"
+          value={time}
+          onChange={setTime}
+          error={submitted ? errors.time : undefined}
+          interval={30}
+        />
+      </div>
+
+      <Select
+        label="Tipo de consulta"
+        options={types}
+        value={type}
+        onChange={(event) => setType(event.target.value)}
+        portalContainer={dialog}
+      />
+
+      <div className="mt-2 flex flex-wrap gap-3">
+        <SmallButton type="submit" variant="solid">
+          {saving ? "Agendando..." : "Agendar consulta"}
+        </SmallButton>
+
+        <SmallButton onClick={onCancel}>
+          Cancelar
+        </SmallButton>
+      </div>
+    </form>
   );
 }

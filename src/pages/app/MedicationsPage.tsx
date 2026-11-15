@@ -9,6 +9,7 @@ import {
   type PatientProfile,
 } from "../../services/api/patients";
 import { useSession } from "../../modules/session/session";
+import Select from "../../components/ui/Select";
 
 type PatientOption = {
   id: string;
@@ -127,25 +128,15 @@ export default function MedicationsPage() {
             </p>
           ) : patients.length > 0 ? (
             <div className="max-w-md">
-              <label
-                htmlFor="medications-patient"
-                className="mb-2 block text-sm font-medium"
-              >
-                Escolher paciente
-              </label>
-
-              <select
-                id="medications-patient"
+              <Select
+                label="Escolher paciente"
+                options={patients.map((patient) => ({
+                  label: patient.name,
+                  value: patient.id,
+                }))}
                 value={selectedId}
                 onChange={(event) => setSelectedId(event.target.value)}
-                className="h-14 w-full rounded-full border border-field-border bg-white px-5 text-sm outline-none focus:border-action"
-              >
-                {patients.map((patient) => (
-                  <option key={patient.id} value={patient.id}>
-                    {patient.name}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           ) : (
             <p className="text-sm text-muted">
