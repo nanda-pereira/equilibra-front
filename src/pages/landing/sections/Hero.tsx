@@ -35,7 +35,6 @@ export default function Hero() {
           delay={240}
           className="mt-14 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-[25px]"
         >
-          <Button href="/login">Acesso à plataforma</Button>
           <Button href="#problema" variant="outline">
             Saiba mais
           </Button>

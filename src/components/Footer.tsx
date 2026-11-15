@@ -1,17 +1,17 @@
-import Icon from "./ui/Icon";
+// import Icon from "./ui/Icon";
 import Logo from "./ui/Logo";
-import { InstagramIcon, MailIcon, YoutubeIcon } from "./ui/icons";
+// import { InstagramIcon, MailIcon, YoutubeIcon } from "./ui/icons";
 
 // TODO: preencher o href quando existirem os destinos
 // (e-mail: "mailto:contato@..."; YouTube e Instagram: URL do canal e do perfil)
-const socials: { label: string; icon: typeof MailIcon; href?: string }[] = [
-  { label: "E-mail", icon: MailIcon },
-  { label: "YouTube", icon: YoutubeIcon },
-  { label: "Instagram", icon: InstagramIcon },
-];
+// const socials: { label: string; icon: typeof MailIcon; href?: string }[] = [
+//   { label: "E-mail", icon: MailIcon },
+//   { label: "YouTube", icon: YoutubeIcon },
+//   { label: "Instagram", icon: InstagramIcon },
+// ];
 
-const circle =
-  "flex size-11 items-center justify-center rounded-full bg-mint-100 text-action";
+// const circle =
+//   "flex size-11 items-center justify-center rounded-full bg-mint-100 text-action";
 
 export default function Footer() {
   return (
@@ -21,7 +21,7 @@ export default function Footer() {
           <Logo />
         </a>
 
-        <ul aria-label="Contato e redes sociais" className="flex items-center gap-4">
+        {/* <ul aria-label="Contato e redes sociais" className="flex items-center gap-4">
           {socials.map(({ label, icon, href }) => (
             <li key={label}>
               {href ? (
@@ -41,7 +41,7 @@ export default function Footer() {
               )}
             </li>
           ))}
-        </ul>
+        </ul> */}
 
         <p className="text-sm text-ink-soft">
           © 2026 Equilibra. Todos os direitos reservados.
