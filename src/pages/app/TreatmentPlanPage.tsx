@@ -1,10 +1,16 @@
-
 import { useEffect, useState } from "react";
-
+import { Navigate } from "react-router";
+import type { FormEvent } from "react";
 import EmptyState from "../../components/app/EmptyState";
 import GlassCard from "../../components/app/GlassCard";
 import ListRow from "../../components/app/ListRow";
 import PageHeader from "../../components/app/PageHeader";
+import SmallButton from "../../components/app/SmallButton";
+
+import Select from "../../components/ui/Select";
+import DatePicker from "../../components/ui/DatePicker";
+import Icon from "../../components/ui/Icon";
+import Input from "../../components/ui/Input";
 
 import {
   CalendarIcon,
@@ -37,6 +43,17 @@ import {
 } from "../../services/api/exercises";
 
 const API_URL: string | undefined = import.meta.env.VITE_API_URL;
+
+const styles = {
+  input:
+    "w-full min-h-14 rounded-2xl border border-[#788685]/60 bg-white px-4 py-3 text-sm text-[#282B2D] outline-none transition placeholder:text-[#586463]/75 focus:border-[#247477] focus:ring-4 focus:ring-[#247477]/10 disabled:cursor-not-allowed disabled:opacity-60",
+  mutedPanel:
+    "rounded-2xl border border-[#247477]/10 bg-[#F4F9F8] p-4 sm:p-5",
+  item:
+    "rounded-2xl border border-[#788685]/20 bg-white p-4 transition hover:border-[#247477]/30 sm:p-5",
+  eyebrow:
+    "mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#247477]",
+};
 
 type ClinicalRecordData = {
   title?: string;
@@ -92,10 +109,8 @@ async function getRecords<T>(
     throw new Error("A URL da API não está configurada.");
   }
 
-  const query = `?patientId=${encodeURIComponent(patientId)}`;
-
   const response = await fetch(
-    `${API_URL}/records/${resource}${query}`,
+    `${API_URL}/records/${resource}?patientId=${encodeURIComponent(patientId)}`,
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -169,9 +184,7 @@ function formatDate(value?: string | null): string {
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) {
-    return "Data não informada";
-  }
+  if (Number.isNaN(date.getTime())) return "Data não informada";
 
   return new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
@@ -185,9 +198,7 @@ function formatDateTime(value?: string | null): string {
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) {
-    return "Data não informada";
-  }
+  if (Number.isNaN(date.getTime())) return "Data não informada";
 
   return new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
@@ -213,11 +224,7 @@ function getClinicalRecordTitle(record: ClinicalRecord): string {
 }
 
 function getClinicalRecordDescription(record: ClinicalRecord): string {
-  return (
-    record.data.text ??
-    record.data.notes ??
-    "Sem descrição registrada."
-  );
+  return record.data.text ?? record.data.notes ?? "Sem descrição registrada.";
 }
 
 function getPatientOption(patient: PatientProfile): PatientOption | null {
@@ -226,6 +233,7 @@ function getPatientOption(patient: PatientProfile): PatientOption | null {
   if (!id) return null;
 
   const user = patient.userId;
+
   const name =
     typeof user === "object" && user !== null && "fullName" in user
       ? String(user.fullName ?? "")
@@ -260,6 +268,8 @@ function FormField({
   placeholder,
   multiline = false,
   type = "text",
+  required = false,
+  min,
 }: {
   label: string;
   value: string;
@@ -267,31 +277,192 @@ function FormField({
   placeholder?: string;
   multiline?: boolean;
   type?: string;
+  required?: boolean;
+  min?: string;
 }) {
-  const className =
-    "w-full rounded-2xl border border-ink/15 bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-teal-700";
+  if (type === "date") {
+    return (
+      <DatePicker
+        label={label}
+        value={value}
+        onChange={onChange}
+        min={min}
+        required={required}
+      />
+    );
+  }
+
+  if (multiline) {
+    return (
+      <label className="flex min-w-0 flex-col">
+        <span className="mb-2.5 text-base text-ink">
+          {label}
+          {required && <span className="ml-1 text-action">*</span>}
+        </span>
+
+        <textarea
+          className="min-h-28 w-full resize-y rounded-[24px] border border-brand bg-transparent px-6 py-4 text-sm text-ink transition-colors placeholder:text-placeholder hover:bg-mint-100/60 focus:border-action focus:bg-white/60 focus:outline-none focus:ring-4 focus:ring-action/15"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          required={required}
+          rows={4}
+        />
+      </label>
+    );
+  }
 
   return (
-    <label className="flex flex-col gap-2 text-sm font-medium text-ink">
-      {label}
+    <Input
+      label={label}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={placeholder}
+      required={required}
+      type={type}
+      min={min}
+      autoComplete="off"
+    />
+  );
+}
 
-      {multiline ? (
-        <textarea
-          className={`${className} min-h-24 resize-y`}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-        />
-      ) : (
-        <input
-          className={className}
-          type={type}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-        />
+function SectionHeading({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow?: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="mb-5">
+      {eyebrow && <p className={styles.eyebrow}>{eyebrow}</p>}
+
+      <h2 className="text-lg font-semibold tracking-tight text-[#123F42] sm:text-xl">
+        {title}
+      </h2>
+
+      {description && (
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#586463]">
+          {description}
+        </p>
       )}
-    </label>
+    </div>
+  );
+}
+
+function FeedbackMessage({
+  type,
+  children,
+}: {
+  type: "error" | "success";
+  children: string;
+}) {
+  const isError = type === "error";
+
+  return (
+    <div
+      role={isError ? "alert" : "status"}
+      className={`rounded-2xl border p-4 text-sm leading-6 ${
+        isError
+          ? "border-amber-300/70 bg-amber-50 text-amber-950"
+          : "border-[#247477]/20 bg-[#F4F9F8] text-[#123F42]"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+            isError ? "bg-amber-200/70" : "bg-[#247477]/10"
+          }`}
+          aria-hidden="true"
+        >
+          {isError ? "!" : "✓"}
+        </span>
+
+        <p>{children}</p>
+      </div>
+    </div>
+  );
+}
+
+function LoadingMessage({ children }: { children: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-[#247477]/10 bg-white/80 p-4">
+      <span className="size-5 animate-spin rounded-full border-2 border-[#247477]/20 border-t-[#247477]" />
+      <p className="text-sm text-[#586463]">{children}</p>
+    </div>
+  );
+}
+
+function SummaryTile({
+  icon,
+  label,
+  value,
+}: {
+  icon: typeof CalendarIcon;
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-[#247477]/10 bg-white/85 p-4">
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#F4F9F8] text-[#247477]">
+        <Icon icon={icon} size={21} />
+      </span>
+
+      <div className="min-w-0">
+        <p className="text-2xl font-semibold leading-tight text-[#123F42]">
+          {value}
+        </p>
+        <p className="mt-1 text-xs leading-5 text-[#586463]">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function DateRange({
+  startsAt,
+  endsAt,
+}: {
+  startsAt?: string;
+  endsAt?: string;
+}) {
+  if (!startsAt && !endsAt) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm text-[#586463]">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#F4F9F8] text-[#247477]">
+        <Icon icon={CalendarIcon} size={16} />
+      </span>
+
+      <span>
+        {formatDate(startsAt)} até {formatDate(endsAt)}
+      </span>
+    </div>
+  );
+}
+
+function GoalList({ goals }: { goals?: string[] }) {
+  if (!goals?.length) return null;
+
+  return (
+    <div className="rounded-2xl bg-[#F4F9F8] p-4">
+      <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[#247477]">
+        Objetivos do acompanhamento
+      </p>
+
+      <ul className="flex flex-col gap-2">
+        {goals.map((goal, index) => (
+          <li
+            key={`${goal}-${index}`}
+            className="flex items-start gap-3 text-sm leading-6 text-[#586463]"
+          >
+            <span className="mt-2 size-1.5 shrink-0 rounded-full bg-[#247477]" />
+            <span>{goal}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -322,16 +493,18 @@ function ProfessionalTreatmentPanel({
 
   const [treatmentTitle, setTreatmentTitle] = useState("");
   const [treatmentDescription, setTreatmentDescription] = useState("");
-  const [treatmentInstructions, setTreatmentInstructions] = useState("");
   const [treatmentGoals, setTreatmentGoals] = useState("");
   const [treatmentStart, setTreatmentStart] = useState("");
   const [treatmentEnd, setTreatmentEnd] = useState("");
 
   const [exerciseTitle, setExerciseTitle] = useState("");
-  const [exerciseIds, setExerciseIds] = useState("");
+  const [exerciseIds, setExerciseIds] = useState<string[]>([]);
   const [exerciseSchedule, setExerciseSchedule] = useState("");
   const [exerciseStart, setExerciseStart] = useState("");
   const [exerciseEnd, setExerciseEnd] = useState("");
+
+  const availableExercises = exercises?.exercises ?? [];
+  const exercisePlans = exercises?.plans ?? [];
 
   useEffect(() => {
     let cancelled = false;
@@ -356,15 +529,11 @@ function ProfessionalTreatmentPanel({
           .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
         setPatients(options);
-        setSelectedId((current) => {
-          if (current && options.some((patient) => patient.id === current)) {
-            return current;
-          }
-
-          return options[0]?.id ?? "";
-        });
+        setSelectedId("");
       } catch (loadError) {
         if (!cancelled) {
+          setPatients([]);
+          setSelectedId("");
           setError(
             loadError instanceof Error
               ? loadError.message
@@ -390,6 +559,7 @@ function ProfessionalTreatmentPanel({
       if (!session?.accessToken || !selectedId) {
         setPlans([]);
         setExercises(null);
+        setLoadingRecords(false);
         return;
       }
 
@@ -400,7 +570,7 @@ function ProfessionalTreatmentPanel({
       setExercises(null);
 
       try {
-        const requests = await Promise.allSettled([
+        const results = await Promise.allSettled([
           getRecords<TreatmentPlanRecord>(
             "treatment-plans",
             selectedId,
@@ -411,8 +581,7 @@ function ProfessionalTreatmentPanel({
 
         if (cancelled) return;
 
-        const plansResult = requests[0];
-        const exercisesResult = requests[1];
+        const [plansResult, exercisesResult] = results;
 
         if (plansResult.status === "fulfilled") {
           setPlans(plansResult.value);
@@ -422,11 +591,7 @@ function ProfessionalTreatmentPanel({
           setExercises(exercisesResult.value);
         }
 
-        const failures = requests.filter(
-          (request) => request.status === "rejected",
-        );
-
-        if (failures.length > 0) {
+        if (results.some((result) => result.status === "rejected")) {
           setError(
             "Algumas informações não puderam ser carregadas. Verifique as permissões de acesso do seu perfil.",
           );
@@ -455,7 +620,6 @@ function ProfessionalTreatmentPanel({
     setEditingTreatmentId(null);
     setTreatmentTitle("");
     setTreatmentDescription("");
-    setTreatmentInstructions("");
     setTreatmentGoals("");
     setTreatmentStart("");
     setTreatmentEnd("");
@@ -464,7 +628,7 @@ function ProfessionalTreatmentPanel({
   function resetExerciseForm() {
     setEditingExerciseId(null);
     setExerciseTitle("");
-    setExerciseIds("");
+    setExerciseIds([]);
     setExerciseSchedule("");
     setExerciseStart("");
     setExerciseEnd("");
@@ -473,31 +637,53 @@ function ProfessionalTreatmentPanel({
   function editTreatment(plan: TreatmentPlanRecord) {
     setEditingTreatmentId(plan._id);
     setTreatmentTitle(plan.data.title ?? "");
-    setTreatmentDescription(plan.data.description ?? "");
-    setTreatmentInstructions(plan.data.instructions ?? "");
+    setTreatmentDescription(
+      plan.data.description ?? plan.data.instructions ?? "",
+    );
     setTreatmentGoals(plan.data.goals?.join(", ") ?? "");
     setTreatmentStart(toDateInput(plan.data.startsAt));
     setTreatmentEnd(toDateInput(plan.data.endsAt));
     setNotice(null);
+    setError(null);
   }
 
   function editExercisePlan(plan: ExerciseRecord<PatientExercisePlanData>) {
     setEditingExerciseId(plan._id);
     setExerciseTitle(plan.data.title ?? "");
-    setExerciseIds(plan.data.exerciseIds?.join(", ") ?? "");
+    setExerciseIds(plan.data.exerciseIds ?? []);
     setExerciseSchedule(plan.data.schedule?.join(", ") ?? "");
     setExerciseStart(toDateInput(plan.data.startsAt));
     setExerciseEnd(toDateInput(plan.data.endsAt));
     setNotice(null);
+    setError(null);
   }
 
-  async function saveTreatment(event: React.FormEvent<HTMLFormElement>) {
+  function toggleExercise(exerciseId: string) {
+    setExerciseIds((current) =>
+      current.includes(exerciseId)
+        ? current.filter((id) => id !== exerciseId)
+        : [...current, exerciseId],
+    );
+  }
+
+  async function saveTreatment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!canManage || !session?.accessToken || !selectedId) return;
 
     if (!treatmentTitle.trim()) {
       setError("Informe o título do plano de tratamento.");
+      return;
+    }
+
+    if (
+      treatmentStart &&
+      treatmentEnd &&
+      new Date(treatmentEnd) < new Date(treatmentStart)
+    ) {
+      setError(
+        "A data de término deve ser igual ou posterior à data de início.",
+      );
       return;
     }
 
@@ -508,7 +694,6 @@ function ProfessionalTreatmentPanel({
     const data: TreatmentPlanData = {
       title: treatmentTitle.trim(),
       description: treatmentDescription.trim(),
-      instructions: treatmentInstructions.trim(),
       goals: treatmentGoals
         .split(",")
         .map((goal) => goal.trim())
@@ -555,7 +740,7 @@ function ProfessionalTreatmentPanel({
     }
   }
 
-  async function saveExercisePlan(event: React.FormEvent<HTMLFormElement>) {
+  async function saveExercisePlan(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!canManage || !session?.accessToken || !selectedId) return;
@@ -565,16 +750,29 @@ function ProfessionalTreatmentPanel({
       return;
     }
 
+    if (exerciseIds.length === 0) {
+      setError("Selecione pelo menos um exercício para o plano.");
+      return;
+    }
+
+    if (
+      exerciseStart &&
+      exerciseEnd &&
+      new Date(exerciseEnd) < new Date(exerciseStart)
+    ) {
+      setError(
+        "A data de término deve ser igual ou posterior à data de início.",
+      );
+      return;
+    }
+
     setSaving(true);
     setError(null);
     setNotice(null);
 
     const data: PatientExercisePlanData = {
       title: exerciseTitle.trim(),
-      exerciseIds: exerciseIds
-        .split(",")
-        .map((id) => id.trim())
-        .filter(Boolean),
+      exerciseIds,
       schedule: exerciseSchedule
         .split(",")
         .map((item) => item.trim())
@@ -623,303 +821,398 @@ function ProfessionalTreatmentPanel({
         title="Planos de tratamento"
         subtitle={
           canManage
-            ? "Selecione um paciente para consultar e organizar seus planos de cuidado."
+            ? "Organize o acompanhamento, as orientações e os exercícios de cada paciente."
             : "Consulte os planos de cuidado dos pacientes vinculados ao seu perfil."
         }
       />
 
       <GlassCard title="Paciente">
         {loadingPatients ? (
-          <p className="text-sm text-ink-soft">Carregando pacientes...</p>
+          <LoadingMessage>Carregando pacientes...</LoadingMessage>
         ) : patients.length === 0 ? (
           <EmptyState title="Nenhum paciente disponível para consulta" />
         ) : (
-          <label className="flex flex-col gap-2 text-sm font-medium text-ink">
-            Escolher paciente
-
-            <select
-              className="w-full rounded-2xl border border-ink/15 bg-white px-4 py-3 text-sm outline-none focus:border-teal-700"
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <Select
+              label="Selecionar paciente"
+              options={patients.map((patient) => ({
+                label: patient.name,
+                value: patient.id,
+              }))}
               value={selectedId}
-              onChange={(event) => setSelectedId(event.target.value)}
-            >
-              {patients.map((patient) => (
-                <option key={patient.id} value={patient.id}>
-                  {patient.name}
-                </option>
-              ))}
-            </select>
-          </label>
+              placeholder="Selecione um paciente"
+              onChange={(event) => {
+                setSelectedId(event.target.value);
+                resetTreatmentForm();
+                resetExerciseForm();
+                setError(null);
+                setNotice(null);
+              }}
+            />
+
+            <p className="pb-1 text-sm text-[#586463]">
+              {patients.length} paciente(s) disponível(is)
+            </p>
+          </div>
         )}
       </GlassCard>
 
-      {error && (
-        <div
-          role="alert"
-          className="rounded-2xl border border-amber-300/60 bg-amber-50 p-4 text-sm text-amber-900"
-        >
-          {error}
-        </div>
-      )}
-
-      {notice && (
-        <div
-          role="status"
-          className="rounded-2xl border border-teal-700/20 bg-teal-50 p-4 text-sm text-teal-900"
-        >
-          {notice}
-        </div>
-      )}
+      {error && <FeedbackMessage type="error">{error}</FeedbackMessage>}
+      {notice && <FeedbackMessage type="success">{notice}</FeedbackMessage>}
 
       {loadingRecords && (
-        <p className="text-sm text-ink-soft">
-          Carregando os planos do paciente...
-        </p>
+        <LoadingMessage>Carregando os planos do paciente...</LoadingMessage>
       )}
 
-      <GlassCard title="Planos de tratamento">
-        {plans.length === 0 ? (
-          <EmptyState title="Nenhum plano de tratamento encontrado" />
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {plans.map((plan) => (
-              <li
-                key={plan._id}
-                className="flex flex-col gap-3 rounded-2xl border border-ink/10 p-4"
-              >
-                <ListRow
-                  icon={MessageIcon}
-                  title={plan.data.title ?? "Plano de tratamento"}
-                  subtitle={
-                    plan.data.description ??
-                    plan.data.instructions ??
-                    plan.data.goals?.join(" · ") ??
-                    "Sem orientações adicionais."
-                  }
-                />
+      {!loadingPatients && patients.length > 0 && !selectedId && (
+        <div className={styles.mutedPanel}>
+          <div className="flex flex-col items-center gap-3 py-5 text-center">
+            <span className="flex size-14 items-center justify-center rounded-2xl bg-white text-[#247477]">
+              <Icon icon={MessageIcon} size={28} />
+            </span>
 
-                {(plan.data.startsAt || plan.data.endsAt) && (
-                  <p className="text-xs text-ink-soft">
-                    Período: {formatDate(plan.data.startsAt)} até{" "}
-                    {formatDate(plan.data.endsAt)}
-                  </p>
-                )}
+            <h2 className="text-base font-semibold text-[#123F42]">
+              Selecione um paciente
+            </h2>
 
-                {plan.data.goals && plan.data.goals.length > 0 && (
-                  <p className="text-sm text-ink-soft">
-                    Objetivos: {plan.data.goals.join(" · ")}
-                  </p>
-                )}
+            <p className="max-w-md text-sm leading-6 text-[#586463]">
+              Escolha um paciente no campo acima para visualizar os planos de
+              tratamento, os exercícios e as opções de gerenciamento.
+            </p>
+          </div>
+        </div>
+      )}
 
-                {canManage && (
-                  <button
-                    type="button"
-                    className="self-start rounded-full border border-teal-700/30 px-4 py-2 text-sm font-medium text-teal-800 hover:bg-teal-50"
-                    onClick={() => editTreatment(plan)}
-                  >
-                    Editar plano
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </GlassCard>
-
-      <GlassCard title="Planos de exercícios">
-        {(exercises?.plans.length ?? 0) === 0 ? (
-          <EmptyState title="Nenhum plano de exercícios encontrado" />
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {(exercises?.plans ?? []).map((plan) => (
-              <li
-                key={plan._id}
-                className="flex flex-col gap-3 rounded-2xl border border-ink/10 p-4"
-              >
-                <ListRow
-                  icon={ExerciseIcon}
-                  title={plan.data.title ?? "Plano de exercícios"}
-                  subtitle={
-                    plan.data.schedule?.join(", ") ||
-                    "Frequência não informada"
-                  }
-                />
-
-                {(plan.data.startsAt || plan.data.endsAt) && (
-                  <p className="text-xs text-ink-soft">
-                    Período: {formatDate(plan.data.startsAt)} até{" "}
-                    {formatDate(plan.data.endsAt)}
-                  </p>
-                )}
-
-                {canManage && (
-                  <button
-                    type="button"
-                    className="self-start rounded-full border border-teal-700/30 px-4 py-2 text-sm font-medium text-teal-800 hover:bg-teal-50"
-                    onClick={() => editExercisePlan(plan)}
-                  >
-                    Editar plano
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </GlassCard>
-
-      {canManage && (
+      {!loadingPatients && patients.length > 0 && selectedId && (
         <>
-          <GlassCard
-            title={
-              editingTreatmentId
-                ? "Editar plano de tratamento"
-                : "Novo plano de tratamento"
-            }
-          >
-            <form className="flex flex-col gap-4" onSubmit={saveTreatment}>
-              <FormField
-                label="Título"
-                value={treatmentTitle}
-                onChange={setTreatmentTitle}
-                placeholder="Ex.: Plano de acompanhamento"
-              />
+          <div className="grid gap-3 sm:grid-cols-3">
+            <SummaryTile
+              icon={MessageIcon}
+              label="Planos de tratamento"
+              value={plans.length}
+            />
 
-              <FormField
-                label="Descrição"
-                value={treatmentDescription}
-                onChange={setTreatmentDescription}
-                placeholder="Descreva o objetivo geral do plano"
-                multiline
-              />
+            <SummaryTile
+              icon={ExerciseIcon}
+              label="Planos de exercícios"
+              value={exercisePlans.length}
+            />
 
-              <FormField
-                label="Orientações"
-                value={treatmentInstructions}
-                onChange={setTreatmentInstructions}
-                placeholder="Orientações para o paciente"
-                multiline
-              />
+            <SummaryTile
+              icon={CalendarIcon}
+              label="Exercícios disponíveis"
+              value={availableExercises.length}
+            />
+          </div>
 
-              <FormField
-                label="Objetivos"
-                value={treatmentGoals}
-                onChange={setTreatmentGoals}
-                placeholder="Separe os objetivos por vírgula"
-              />
+          <GlassCard title="Planos de tratamento">
+            <div className="flex flex-col gap-4">
+              {plans.length === 0 ? (
+                <EmptyState title="Nenhum plano de tratamento cadastrado" />
+              ) : (
+                <ul className="flex flex-col gap-3">
+                  {plans.map((plan) => (
+                    <li key={plan._id} className={styles.item}>
+                      <div className="flex flex-col gap-4">
+                        <ListRow
+                          icon={MessageIcon}
+                          title={plan.data.title ?? "Plano de tratamento"}
+                          subtitle={
+                            plan.data.description ??
+                            plan.data.instructions ??
+                            "Sem descrição registrada."
+                          }
+                        />
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FormField
-                  label="Data de início"
-                  type="date"
-                  value={treatmentStart}
-                  onChange={setTreatmentStart}
-                />
+                        <DateRange
+                          startsAt={plan.data.startsAt}
+                          endsAt={plan.data.endsAt}
+                        />
 
-                <FormField
-                  label="Data de término"
-                  type="date"
-                  value={treatmentEnd}
-                  onChange={setTreatmentEnd}
-                />
-              </div>
+                        <GoalList goals={plan.data.goals} />
 
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="submit"
-                  disabled={saving || !selectedId}
-                  className="rounded-full bg-teal-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-900 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {saving
-                    ? "Salvando..."
-                    : editingTreatmentId
-                      ? "Salvar alterações"
-                      : "Cadastrar plano"}
-                </button>
+                        {canManage && (
+                          <div className="flex justify-end border-t border-[#788685]/15 pt-3">
+                            <SmallButton
+                              type="button"
+                              onClick={() => editTreatment(plan)}
+                            >
+                              Editar plano
+                            </SmallButton>
+                          </div>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
-                {editingTreatmentId && (
-                  <button
-                    type="button"
-                    className="rounded-full border border-ink/15 px-5 py-3 text-sm font-medium"
-                    onClick={resetTreatmentForm}
+              {canManage && (
+                <div className="border-t border-[#788685]/15 pt-5">
+                  <SectionHeading
+                    eyebrow="Gerenciamento"
+                    title={
+                      editingTreatmentId
+                        ? "Editar plano de tratamento"
+                        : "Novo plano de tratamento"
+                    }
+                    description="Registre as orientações e os objetivos do acompanhamento do paciente."
+                  />
+
+                  <form
+                    className="flex flex-col gap-4"
+                    onSubmit={saveTreatment}
                   >
-                    Cancelar edição
-                  </button>
-                )}
-              </div>
-            </form>
+                    <FormField
+                      label="Título do plano"
+                      value={treatmentTitle}
+                      onChange={setTreatmentTitle}
+                      placeholder="Ex.: Acompanhamento motor"
+                      required
+                    />
+
+                    <FormField
+                      label="Descrição e orientações"
+                      value={treatmentDescription}
+                      onChange={setTreatmentDescription}
+                      placeholder="Descreva as orientações do acompanhamento."
+                      multiline
+                    />
+
+                    <FormField
+                      label="Objetivos"
+                      value={treatmentGoals}
+                      onChange={setTreatmentGoals}
+                      placeholder="Separe os objetivos por vírgulas"
+                    />
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <FormField
+                        label="Data de início"
+                        value={treatmentStart}
+                        onChange={setTreatmentStart}
+                        type="date"
+                        required
+                      />
+
+                      <FormField
+                        label="Data de término"
+                        value={treatmentEnd}
+                        onChange={setTreatmentEnd}
+                        type="date"
+                        min={treatmentStart || undefined}
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap justify-end gap-3">
+                      {editingTreatmentId && (
+                        <SmallButton
+                          type="button"
+                          onClick={resetTreatmentForm}
+                        >
+                          Cancelar edição
+                        </SmallButton>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="min-h-12 rounded-full bg-[#247477] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#1B5E60] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {saving
+                          ? "Salvando..."
+                          : editingTreatmentId
+                            ? "Salvar alterações"
+                            : "Criar plano"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
           </GlassCard>
 
-          <GlassCard
-            title={
-              editingExerciseId
-                ? "Editar plano de exercícios"
-                : "Novo plano de exercícios"
-            }
-          >
-            <form className="flex flex-col gap-4" onSubmit={saveExercisePlan}>
-              <FormField
-                label="Título"
-                value={exerciseTitle}
-                onChange={setExerciseTitle}
-                placeholder="Ex.: Rotina de exercícios diários"
-              />
+          <GlassCard title="Planos de exercícios">
+            <div className="flex flex-col gap-4">
+              {exercisePlans.length === 0 ? (
+                <EmptyState title="Nenhum plano de exercícios cadastrado" />
+              ) : (
+                <ul className="flex flex-col gap-3">
+                  {exercisePlans.map((plan) => (
+                    <li key={plan._id} className={styles.item}>
+                      <div className="flex flex-col gap-4">
+                        <ListRow
+                          icon={ExerciseIcon}
+                          title={plan.data.title ?? "Plano de exercícios"}
+                          subtitle={
+                            plan.data.schedule?.join(", ") ||
+                            "Frequência não informada"
+                          }
+                        />
 
-              <FormField
-                label="IDs dos exercícios"
-                value={exerciseIds}
-                onChange={setExerciseIds}
-                placeholder="IDs separados por vírgula"
-              />
+                        <DateRange
+                          startsAt={plan.data.startsAt}
+                          endsAt={plan.data.endsAt}
+                        />
 
-              <FormField
-                label="Frequência e horários"
-                value={exerciseSchedule}
-                onChange={setExerciseSchedule}
-                placeholder="Ex.: Segunda, Quarta, Sexta"
-              />
+                        {canManage && (
+                          <div className="flex justify-end border-t border-[#788685]/15 pt-3">
+                            <SmallButton
+                              type="button"
+                              onClick={() => editExercisePlan(plan)}
+                            >
+                              Editar plano
+                            </SmallButton>
+                          </div>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FormField
-                  label="Data de início"
-                  type="date"
-                  value={exerciseStart}
-                  onChange={setExerciseStart}
-                />
+              {canManage && (
+                <div className="border-t border-[#788685]/15 pt-5">
+                  <SectionHeading
+                    eyebrow="Gerenciamento"
+                    title={
+                      editingExerciseId
+                        ? "Editar plano de exercícios"
+                        : "Novo plano de exercícios"
+                    }
+                    description="Escolha os exercícios e defina a frequência e o período do plano."
+                  />
 
-                <FormField
-                  label="Data de término"
-                  type="date"
-                  value={exerciseEnd}
-                  onChange={setExerciseEnd}
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="submit"
-                  disabled={saving || !selectedId}
-                  className="rounded-full bg-teal-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-900 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {saving
-                    ? "Salvando..."
-                    : editingExerciseId
-                      ? "Salvar alterações"
-                      : "Cadastrar plano"}
-                </button>
-
-                {editingExerciseId && (
-                  <button
-                    type="button"
-                    className="rounded-full border border-ink/15 px-5 py-3 text-sm font-medium"
-                    onClick={resetExerciseForm}
+                  <form
+                    className="flex flex-col gap-4"
+                    onSubmit={saveExercisePlan}
                   >
-                    Cancelar edição
-                  </button>
-                )}
-              </div>
-            </form>
+                    <FormField
+                      label="Título do plano"
+                      value={exerciseTitle}
+                      onChange={setExerciseTitle}
+                      placeholder="Ex.: Rotina de mobilidade"
+                      required
+                    />
+
+                    <div className="flex flex-col gap-3">
+                      <p className="text-sm font-medium text-[#123F42]">
+                        Exercícios disponíveis
+                        <span className="ml-1 text-[#247477]">*</span>
+                      </p>
+
+                      {availableExercises.length === 0 ? (
+                        <div className={styles.mutedPanel}>
+                          <p className="text-sm leading-6 text-[#586463]">
+                            Não há exercícios disponíveis para selecionar
+                            neste momento.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {availableExercises.map((exercise) => {
+                            const exerciseId = exercise._id;
+                            const selected = exerciseIds.includes(exerciseId);
+
+                            return (
+                              <label
+                                key={exerciseId}
+                                className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${
+                                  selected
+                                    ? "border-[#247477]/50 bg-[#F4F9F8]"
+                                    : "border-[#788685]/20 bg-white hover:border-[#247477]/30"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selected}
+                                  onChange={() => toggleExercise(exerciseId)}
+                                  className="mt-1 size-4 accent-[#247477]"
+                                />
+
+                                <span className="min-w-0">
+                                  <span className="block text-sm font-semibold text-[#123F42]">
+                                    {
+                                      exercise.data.name || "Exercício" 
+                                    }
+                                  </span>
+
+                                  {exercise.data.description && (
+                                    <span className="mt-1 block text-sm leading-5 text-[#586463]">
+                                      {exercise.data.description}
+                                    </span>
+                                  )}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      <p className="text-xs text-[#586463]">
+                        {exerciseIds.length} exercício(s) selecionado(s)
+                      </p>
+                    </div>
+
+                    <FormField
+                      label="Frequência e horários"
+                      value={exerciseSchedule}
+                      onChange={setExerciseSchedule}
+                      placeholder="Ex.: Segunda, quarta e sexta"
+                    />
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <FormField
+                        label="Data de início"
+                        value={exerciseStart}
+                        onChange={setExerciseStart}
+                        type="date"
+                        required
+                      />
+
+                      <FormField
+                        label="Data de término"
+                        value={exerciseEnd}
+                        onChange={setExerciseEnd}
+                        type="date"
+                        min={exerciseStart || undefined}
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap justify-end gap-3">
+                      {editingExerciseId && (
+                        <SmallButton
+                          type="button"
+                          onClick={resetExerciseForm}
+                        >
+                          Cancelar edição
+                        </SmallButton>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={saving || availableExercises.length === 0}
+                        className="min-h-12 rounded-full bg-[#247477] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#1B5E60] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {saving
+                          ? "Salvando..."
+                          : editingExerciseId
+                            ? "Salvar alterações"
+                            : "Criar plano de exercícios"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
           </GlassCard>
         </>
       )}
+
+      <p className="text-sm leading-6 text-[#586463]">
+        As informações exibidas dependem dos registros disponíveis e das
+        permissões de acesso do seu perfil.
+      </p>
     </div>
   );
 }
@@ -961,6 +1254,7 @@ export default function TreatmentPlanPage() {
 
       try {
         const accessToken = session.accessToken;
+
         const patientId = await getMyPatientProfileId(
           accessToken,
           session.userId,
@@ -975,11 +1269,7 @@ export default function TreatmentPlanPage() {
             patientId,
             accessToken,
           ),
-          getRecords<ClinicalRecord>(
-            "observations",
-            patientId,
-            accessToken,
-          ),
+          getRecords<ClinicalRecord>("observations", patientId, accessToken),
           getRecords<ClinicalRecord>("diary", patientId, accessToken),
         ]);
 
@@ -996,58 +1286,40 @@ export default function TreatmentPlanPage() {
           diaryResult,
         ] = results;
 
-        const failedRequests = results.filter(
-          (result) => result.status === "rejected",
-        );
-
         setState({
           medications:
             medicationsResult.status === "fulfilled"
               ? medicationsResult.value
               : null,
-
           appointments:
             appointmentsResult.status === "fulfilled"
               ? appointmentsResult.value
               : [],
-
           exercises:
             exercisesResult.status === "fulfilled"
               ? exercisesResult.value
               : null,
-
           treatmentPlans:
-            plansResult.status === "fulfilled"
-              ? plansResult.value
-              : [],
-
+            plansResult.status === "fulfilled" ? plansResult.value : [],
           clinicalRecords: [
             ...(observationsResult.status === "fulfilled"
               ? observationsResult.value
               : []),
-            ...(diaryResult.status === "fulfilled"
-              ? diaryResult.value
-              : []),
+            ...(diaryResult.status === "fulfilled" ? diaryResult.value : []),
           ].sort((a, b) => {
             const dateA = new Date(
-              a.data.recordedAt ??
-                a.data.observedAt ??
-                a.createdAt ??
-                0,
+              a.data.recordedAt ?? a.data.observedAt ?? a.createdAt ?? 0,
             ).getTime();
 
             const dateB = new Date(
-              b.data.recordedAt ??
-                b.data.observedAt ??
-                b.createdAt ??
-                0,
+              b.data.recordedAt ?? b.data.observedAt ?? b.createdAt ?? 0,
             ).getTime();
 
             return dateB - dateA;
           }),
         });
 
-        if (failedRequests.length > 0) {
+        if (results.some((result) => result.status === "rejected")) {
           setError(
             "Algumas informações não puderam ser carregadas. Os dados disponíveis continuam visíveis.",
           );
@@ -1078,6 +1350,15 @@ export default function TreatmentPlanPage() {
   ]);
 
   if (!session) return null;
+
+  if (
+    session.profile !== "paciente" &&
+    session.profile !== "medico" &&
+    session.profile !== "cuidador-clinico" &&
+    session.profile !== "cuidador-domiciliar"
+  ) {
+    return <Navigate to="/app/inicio" replace />;
+  }
 
   if (isProfessional) {
     return (
@@ -1134,27 +1415,18 @@ export default function TreatmentPlanPage() {
         subtitle="Consulte os registros e as orientações da sua equipe de saúde."
       />
 
-      {error && (
-        <div
-          role="alert"
-          className="rounded-2xl border border-amber-300/60 bg-amber-50 p-4 text-sm text-amber-900"
-        >
-          {error}
-        </div>
-      )}
+      {error && <FeedbackMessage type="error">{error}</FeedbackMessage>}
 
       {loading && (
-        <p className="text-sm text-ink-soft">
+        <LoadingMessage>
           Carregando informações do seu tratamento...
-        </p>
+        </LoadingMessage>
       )}
 
       <div className="grid gap-6 xl:grid-cols-2">
         <GlassCard title="Medicamentos">
           {loading && !medicationData ? (
-            <p className="text-sm text-ink-soft">
-              Carregando medicamentos...
-            </p>
+            <LoadingMessage>Carregando medicamentos...</LoadingMessage>
           ) : activePrescriptions.length === 0 ? (
             <EmptyState title="Nenhuma prescrição ativa encontrada" />
           ) : (
@@ -1165,18 +1437,19 @@ export default function TreatmentPlanPage() {
                 );
 
                 return (
-                  <ListRow
-                    key={prescription._id}
-                    icon={MedicineIcon}
-                    title={medication?.data.name ?? "Medicamento"}
-                    subtitle={[
-                      `${prescription.data.dose} ${prescription.data.unit}`,
-                      prescription.data.route,
-                      prescription.data.schedule?.join(", "),
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  />
+                  <li key={prescription._id} className={styles.item}>
+                    <ListRow
+                      icon={MedicineIcon}
+                      title={medication?.data.name ?? "Medicamento"}
+                      subtitle={[
+                        `${prescription.data.dose} ${prescription.data.unit}`,
+                        prescription.data.route,
+                        prescription.data.schedule?.join(", "),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    />
+                  </li>
                 );
               })}
             </ul>
@@ -1185,23 +1458,22 @@ export default function TreatmentPlanPage() {
 
         <GlassCard title="Exercícios">
           {loading && !exerciseData ? (
-            <p className="text-sm text-ink-soft">
-              Carregando exercícios...
-            </p>
+            <LoadingMessage>Carregando exercícios...</LoadingMessage>
           ) : activePlans.length === 0 ? (
             <EmptyState title="Nenhum plano de exercícios ativo" />
           ) : (
             <ul className="flex flex-col gap-3">
               {activePlans.map((plan) => (
-                <ListRow
-                  key={plan._id}
-                  icon={ExerciseIcon}
-                  title={plan.data.title ?? "Plano de exercícios"}
-                  subtitle={
-                    plan.data.schedule?.join(", ") ||
-                    "Frequência não informada"
-                  }
-                />
+                <li key={plan._id} className={styles.item}>
+                  <ListRow
+                    icon={ExerciseIcon}
+                    title={plan.data.title ?? "Plano de exercícios"}
+                    subtitle={
+                      plan.data.schedule?.join(", ") ||
+                      "Frequência não informada"
+                    }
+                  />
+                </li>
               ))}
             </ul>
           )}
@@ -1209,25 +1481,24 @@ export default function TreatmentPlanPage() {
 
         <GlassCard title="Próximas consultas">
           {loading ? (
-            <p className="text-sm text-ink-soft">
-              Carregando consultas...
-            </p>
+            <LoadingMessage>Carregando consultas...</LoadingMessage>
           ) : upcomingAppointments.length === 0 ? (
             <EmptyState title="Nenhuma consulta futura encontrada" />
           ) : (
             <ul className="flex flex-col gap-3">
               {upcomingAppointments.map((appointment) => (
-                <ListRow
-                  key={appointment._id}
-                  icon={CalendarIcon}
-                  title={appointment.data.title}
-                  subtitle={[
-                    formatDateTime(getAppointmentDate(appointment)),
-                    appointment.data.location,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                />
+                <li key={appointment._id} className={styles.item}>
+                  <ListRow
+                    icon={CalendarIcon}
+                    title={appointment.data.title}
+                    subtitle={[
+                      formatDateTime(getAppointmentDate(appointment)),
+                      appointment.data.location,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  />
+                </li>
               ))}
             </ul>
           )}
@@ -1235,24 +1506,23 @@ export default function TreatmentPlanPage() {
 
         <GlassCard title="Orientações e registros">
           {loading && state.clinicalRecords.length === 0 ? (
-            <p className="text-sm text-ink-soft">
-              Carregando registros...
-            </p>
+            <LoadingMessage>Carregando registros...</LoadingMessage>
           ) : recentRecords.length === 0 ? (
             <EmptyState title="Nenhuma orientação ou registro encontrado" />
           ) : (
             <ul className="flex flex-col gap-3">
               {recentRecords.map((record) => (
-                <ListRow
-                  key={record._id}
-                  icon={MessageIcon}
-                  title={getClinicalRecordTitle(record)}
-                  subtitle={`${formatDate(
-                    record.data.recordedAt ??
-                      record.data.observedAt ??
-                      record.createdAt,
-                  )} · ${getClinicalRecordDescription(record)}`}
-                />
+                <li key={record._id} className={styles.item}>
+                  <ListRow
+                    icon={MessageIcon}
+                    title={getClinicalRecordTitle(record)}
+                    subtitle={`${formatDate(
+                      record.data.recordedAt ??
+                        record.data.observedAt ??
+                        record.createdAt,
+                    )} · ${getClinicalRecordDescription(record)}`}
+                  />
+                </li>
               ))}
             </ul>
           )}
@@ -1260,32 +1530,40 @@ export default function TreatmentPlanPage() {
 
         <GlassCard title="Orientações do plano">
           {loading && state.treatmentPlans.length === 0 ? (
-            <p className="text-sm text-ink-soft">
-              Carregando orientações...
-            </p>
+            <LoadingMessage>Carregando orientações...</LoadingMessage>
           ) : state.treatmentPlans.length === 0 ? (
             <EmptyState title="Nenhum plano de tratamento cadastrado" />
           ) : (
             <ul className="flex flex-col gap-3">
               {state.treatmentPlans.map((plan) => (
-                <ListRow
-                  key={plan._id}
-                  icon={MessageIcon}
-                  title={plan.data.title ?? "Plano de tratamento"}
-                  subtitle={
-                    plan.data.description ??
-                    plan.data.instructions ??
-                    plan.data.goals?.join(" · ") ??
-                    "Sem orientações adicionais."
-                  }
-                />
+                <li key={plan._id} className={styles.item}>
+                  <div className="flex flex-col gap-4">
+                    <ListRow
+                      icon={MessageIcon}
+                      title={plan.data.title ?? "Plano de tratamento"}
+                      subtitle={
+                        plan.data.description ??
+                        plan.data.instructions ??
+                        plan.data.goals?.join(" · ") ??
+                        "Sem orientações adicionais."
+                      }
+                    />
+
+                    <DateRange
+                      startsAt={plan.data.startsAt}
+                      endsAt={plan.data.endsAt}
+                    />
+
+                    <GoalList goals={plan.data.goals} />
+                  </div>
+                </li>
               ))}
             </ul>
           )}
         </GlassCard>
       </div>
 
-      <p className="text-sm text-ink-soft">
+      <p className="text-sm leading-6 text-[#586463]">
         Em caso de dúvida sobre qualquer orientação, converse com a sua equipe
         de saúde.
       </p>
