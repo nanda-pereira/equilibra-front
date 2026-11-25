@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   createPatientMedication,
@@ -58,6 +57,12 @@ export default function MedicationsPanel({
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
+  // Guarda o medicamento que já foi criado caso a prescrição falhe.
+  // Assim, uma nova tentativa não cria um segundo medicamento.
+  const [pendingMedicationId, setPendingMedicationId] = useState<
+    string | null
+  >(null);
+
   const [name, setName] = useState("");
   const [dose, setDose] = useState("1");
   const [unit, setUnit] = useState("comprimido");
@@ -79,6 +84,7 @@ export default function MedicationsPanel({
           accessToken,
           patientId,
         );
+
         setData(result);
       } catch (err) {
         setError(getErrorMessage(err));
@@ -89,45 +95,48 @@ export default function MedicationsPanel({
     [accessToken, patientId],
   );
 
-  useEffect(() => {
-    if (!accessToken || !patientId) {
-      setLoading(false);
-      return;
-    }
 
-    let active = true;
+useEffect(() => {
+  if (!accessToken || !patientId) {
+    setLoading(false);
+    return;
+  }
 
-    const fetchData = async () => {
-      try {
-        const result = await getPatientMedications(
-          accessToken,
-          patientId,
-        );
+  let active = true;
+  const token = accessToken;
 
-        if (active) {
-          setData(result);
-          setError("");
-        }
-      } catch (err) {
-        if (active) {
-          setError(getErrorMessage(err));
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
+  async function fetchData() {
+    try {
+      const result = await getPatientMedications(
+        token,
+        patientId,
+      );
+
+      if (active) {
+        setData(result);
+        setError("");
       }
-    };
+    } catch (err) {
+      if (active) {
+        setError(getErrorMessage(err));
+      }
+    } finally {
+      if (active) {
+        setLoading(false);
+      }
+    }
+  }
 
-    void fetchData();
+  void fetchData();
 
-    return () => {
-      active = false;
-    };
-  }, [accessToken, patientId]);
+  return () => {
+    active = false;
+  };
+}, [accessToken, patientId]);
+
 
   const prescriptions = (data?.prescriptions ?? []).filter(
-    (item) => item.status === "ACTIVE",
+    (item) => item.status?.toUpperCase() === "ACTIVE",
   );
 
   const today = new Date();
@@ -171,7 +180,6 @@ export default function MedicationsPanel({
           time,
           dose: `${prescription.data.dose} ${prescription.data.unit}`,
           taken,
-          scheduledAt: scheduledAt.toISOString(),
         };
       });
     })
@@ -180,25 +188,29 @@ export default function MedicationsPanel({
   function startAdding() {
     if (!prescribe) return;
 
+    setSubmitted(false);
+    setFlash("");
+    setError("");
+
+    // Ao retomar uma tentativa, preserva os dados já preenchidos.
+    if (pendingMedicationId) {
+      setOpen(true);
+      return;
+    }
+
     setName("");
     setDose("1");
     setUnit("comprimido");
     setRoute("");
     setTimes([""]);
     setNotes("");
-    setSubmitted(false);
-    setFlash("");
-    setError("");
     setOpen(true);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!prescribe) {
-      setOpen(false);
-      return;
-    }
+    if (!prescribe || saving) return;
 
     setSubmitted(true);
     setFlash("");
@@ -229,18 +241,32 @@ export default function MedicationsPanel({
 
     setSaving(true);
 
+    // Variável local: ao contrário do estado React, ela é atualizada
+    // imediatamente e pode ser consultada com segurança no catch.
+    let medicationId = pendingMedicationId;
+
     try {
-      const medication = await createPatientMedication(
-        accessToken,
-        patientId,
-        {
-          name: name.trim(),
-          instructions: notes.trim() || undefined,
-        },
-      );
+      if (!medicationId) {
+        const medication = await createPatientMedication(
+          accessToken,
+          patientId,
+          {
+            name: name.trim(),
+            instructions: notes.trim() || undefined,
+          },
+        );
+
+        medicationId = medication._id;
+        setPendingMedicationId(medicationId);
+
+        // Atualiza os medicamentos cadastrados antes de tentar
+        // criar a prescrição. Se a etapa seguinte falhar, a lista
+        // continuará mostrando o medicamento que já foi salvo.
+        await loadData(false);
+      }
 
       await createPatientPrescription(accessToken, patientId, {
-        medicationId: medication._id,
+        medicationId,
         dose: numericDose,
         unit: unit.trim(),
         route: route.trim(),
@@ -248,11 +274,25 @@ export default function MedicationsPanel({
         instructions: notes.trim() || undefined,
       });
 
+      setPendingMedicationId(null);
       setFlash("Medicamento e prescrição cadastrados com sucesso.");
+      setError("");
       setOpen(false);
+
       await loadData();
     } catch (err) {
-      setError(getErrorMessage(err));
+      const message = getErrorMessage(err);
+
+      // Atualiza a lista sem apagar a mensagem do erro original.
+      await loadData(false);
+
+      if (medicationId) {
+        setError(
+          `O medicamento foi cadastrado, mas a prescrição não foi concluída. Seus dados foram preservados para uma nova tentativa. Detalhes: ${message}`,
+        );
+      } else {
+        setError(message);
+      }
     } finally {
       setSaving(false);
     }
@@ -306,7 +346,7 @@ export default function MedicationsPanel({
             className="ml-2 font-medium underline"
             onClick={() => void loadData()}
           >
-            Tentar novamente
+            Atualizar dados
           </button>
         </div>
       )}
@@ -354,7 +394,9 @@ export default function MedicationsPanel({
         action={
           prescribe ? (
             <SmallButton variant="solid" onClick={startAdding}>
-              Prescrever medicamento
+              {pendingMedicationId
+                ? "Concluir prescrição"
+                : "Prescrever medicamento"}
             </SmallButton>
           ) : undefined
         }
