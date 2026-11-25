@@ -1,6 +1,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "../../../modules/session/session";
+import Avatar from "../../../components/app/Avatar";
 import EmptyState from "../../../components/app/EmptyState";
 import GlassCard from "../../../components/app/GlassCard";
 import ListRow from "../../../components/app/ListRow";
@@ -19,6 +20,7 @@ import {
   getPatientAppointments,
   getPatientMedications,
   getPatientObservations,
+  respondToCareInvite,
 } from "../../../services/api/patients";
 import type { PatientCareLink } from "../../../services/api/patients";
 import { getPatientExercises } from "../../../services/api/exercises";
@@ -106,6 +108,12 @@ export default function HomeCaregiverDashboard() {
   const [linksLoading, setLinksLoading] = useState(true);
   const [linksError, setLinksError] = useState<string | null>(null);
 
+  const [processingLinkId, setProcessingLinkId] = useState<string | null>(
+    null,
+  );
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+
   const [dashboardData, setDashboardData] = useState<
     PatientDashboardData[]
   >([]);
@@ -130,18 +138,62 @@ export default function HomeCaregiverDashboard() {
       setLinksError(
         error instanceof Error
           ? error.message
-          : "Não foi possível carregar os pacientes vinculados.",
+          : "Não foi possível carregar os vínculos.",
       );
     } finally {
       setLinksLoading(false);
     }
   }, [accessToken]);
 
+  const pendingLinks = useMemo(
+    () =>
+      careLinks.filter(
+        (link) =>
+          link.status.toUpperCase() === "PENDING" &&
+          link.relationship.toUpperCase() === "HOME_CAREGIVER",
+      ),
+    [careLinks],
+  );
+
+  const handleInviteResponse = async (
+    link: PatientCareLink,
+    decision: "ACTIVE" | "REJECTED",
+  ) => {
+    if (!accessToken) {
+      setInviteError("Sua sessão expirou. Entre novamente.");
+      return;
+    }
+
+    setProcessingLinkId(link._id);
+    setInviteError(null);
+    setInviteSuccess(null);
+
+    try {
+      await respondToCareInvite(link._id, decision, accessToken);
+
+      setInviteSuccess(
+        decision === "ACTIVE"
+          ? "Solicitação aceita. O vínculo foi atualizado."
+          : "Solicitação recusada.",
+      );
+
+      await loadCareLinks();
+      setRefreshKey((current) => current + 1);
+    } catch (error) {
+      setInviteError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível responder à solicitação.",
+      );
+    } finally {
+      setProcessingLinkId(null);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
 
     async function loadInitialCareLinks() {
-      // Evita atualizações síncronas de estado no corpo do efeito.
       await Promise.resolve();
 
       if (cancelled) return;
@@ -168,7 +220,7 @@ export default function HomeCaregiverDashboard() {
         setLinksError(
           error instanceof Error
             ? error.message
-            : "Não foi possível carregar os pacientes vinculados.",
+            : "Não foi possível carregar os vínculos.",
         );
       } finally {
         if (!cancelled) {
@@ -387,10 +439,7 @@ export default function HomeCaregiverDashboard() {
         return false;
       }
 
-      return (
-        (!startsAt || startsAt <= now) &&
-        (!endsAt || endsAt >= now)
-      );
+      return (!startsAt || startsAt <= now) && (!endsAt || endsAt >= now);
     });
 
     const plannedIds = [
@@ -460,6 +509,100 @@ export default function HomeCaregiverDashboard() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader />
+
+      <GlassCard title="Solicitações de vínculo">
+        {inviteError && (
+          <p
+            role="alert"
+            className="mb-3 rounded-xl bg-red-50 p-3 text-sm text-red-800"
+          >
+            {inviteError}
+          </p>
+        )}
+
+        {inviteSuccess && (
+          <p
+            role="status"
+            className="mb-3 rounded-xl bg-mint-100/70 p-3 text-sm text-ink"
+          >
+            {inviteSuccess}
+          </p>
+        )}
+
+        {linksLoading ? (
+          <p className="py-3 text-sm text-ink-soft">
+            Carregando solicitações...
+          </p>
+        ) : linksError ? (
+          <div className="flex flex-col items-start gap-3">
+            <p role="alert" className="text-sm text-ink-soft">
+              {linksError}
+            </p>
+            <SmallButton onClick={() => void loadCareLinks()}>
+              Tentar novamente
+            </SmallButton>
+          </div>
+        ) : pendingLinks.length === 0 ? (
+          <EmptyState title="Nenhuma solicitação pendente" />
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {pendingLinks.map((link) => {
+              const patient = getLinkedPatient(link);
+              const patientName = patient?.name ?? "Paciente";
+              const isProcessing = processingLinkId === link._id;
+
+              return (
+                <li
+                  key={link._id}
+                  className="flex flex-col gap-4 rounded-[20px] bg-mint-100/70 p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Avatar
+                      name={patientName}
+                      tone="soft"
+                      className="bg-white!"
+                    />
+
+                    <div className="min-w-0">
+                      <p className="font-medium text-ink">{patientName}</p>
+                      <p className="text-sm text-ink-soft">
+                        Solicita vínculo como cuidador domiciliar
+                      </p>
+                      <p className="mt-1 text-xs text-ink-soft">
+                        Aguardando sua resposta
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 sm:shrink-0">
+                    <button
+                      type="button"
+                      disabled={Boolean(processingLinkId)}
+                      onClick={() =>
+                        void handleInviteResponse(link, "REJECTED")
+                      }
+                      className="min-h-11 rounded-full border border-line bg-white px-5 py-2 text-sm font-medium text-ink transition hover:bg-mint-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isProcessing ? "Processando..." : "Recusar"}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={Boolean(processingLinkId)}
+                      onClick={() =>
+                        void handleInviteResponse(link, "ACTIVE")
+                      }
+                      className="min-h-11 rounded-full bg-action px-5 py-2 text-sm font-medium text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isProcessing ? "Processando..." : "Aceitar"}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </GlassCard>
 
       {linksError && (
         <GlassCard title="Pacientes vinculados">
@@ -534,9 +677,7 @@ export default function HomeCaregiverDashboard() {
       <GlassCard
         title="Pacientes vinculados"
         action={
-          <SmallButton
-            onClick={() => setRefreshKey((key) => key + 1)}
-          >
+          <SmallButton onClick={() => setRefreshKey((key) => key + 1)}>
             Atualizar
           </SmallButton>
         }
