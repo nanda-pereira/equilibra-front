@@ -380,6 +380,50 @@ export type CaregiverRelationship =
   | "CLINICAL_CAREGIVER"
   | "HOME_CAREGIVER";
 
+/**
+ * Permissões para os perfis que participam do acompanhamento clínico.
+ *
+ * IMPORTANTE:
+ * Os nomes enviados precisam corresponder às permissões reconhecidas
+ * pelo backend. Esta lista não altera permissões de vínculos existentes
+ * e não substitui as regras de autorização do servidor.
+ */
+const CLINICAL_CARE_PERMISSIONS = [
+  "patient.profile.read",
+  "patient.profile.write",
+  "patient.monitoring.read",
+  "patient.monitoring.write",
+  "patient.events.read",
+  "patient.events.write",
+  "patient.medications.read",
+  "patient.medications.write",
+  "patient.medications.prescribe",
+  "patient.appointments.read",
+  "patient.appointments.write",
+  "patient.exercises.read",
+  "patient.exercises.write",
+  "patient.diary.read",
+  "patient.diary.write",
+  "patient.observations.read",
+  "patient.observations.write",
+  "patient.medication-logs.read",
+  "patient.medication-logs.write",
+];
+
+/**
+ * Permissões limitadas do cuidador domiciliar.
+ * Pode consultar as informações necessárias e registrar doses,
+ * mas não recebe permissão de prescrição nesta lista.
+ */
+const HOME_CARE_PERMISSIONS = [
+  "patient.profile.read",
+  "patient.events.read",
+  "patient.medications.read",
+  "patient.medication-logs.write",
+  "patient.appointments.read",
+  "patient.exercises.read",
+];
+
 export async function inviteCaregiver(
   accessToken: string,
   patientId: string,
@@ -388,32 +432,8 @@ export async function inviteCaregiver(
 ): Promise<PatientCareLink> {
   const permissions =
     relationship === "HOME_CAREGIVER"
-      ? [
-          "patient.profile.read",
-          "patient.events.read",
-          "patient.medications.read",
-          "patient.appointments.read",
-          "patient.exercises.read",
-        ]
-      : relationship === "PROFESSIONAL"
-        ? [
-            "patient.profile.read",
-            "patient.monitoring.read",
-            "patient.events.read",
-            "patient.medications.read",
-            "patient.appointments.read",
-            "patient.exercises.read",
-            "patient.diary.read",
-            "patient.diary.write",
-          ]
-        : [
-            "patient.profile.read",
-            "patient.monitoring.read",
-            "patient.events.read",
-            "patient.medications.read",
-            "patient.appointments.read",
-            "patient.exercises.read",
-          ];
+      ? HOME_CARE_PERMISSIONS
+      : CLINICAL_CARE_PERMISSIONS;
 
   return mutate<PatientCareLink>(
     "/patient-links",
