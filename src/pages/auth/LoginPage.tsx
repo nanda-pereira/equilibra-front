@@ -160,7 +160,7 @@ export default function LoginPage() {
 
           <form noValidate onSubmit={handleSubmit} className="flex flex-col">
             <Input
-              label="E-mail ou número de registro"
+              label="E-mail cadastrado"
               placeholder="nome@email.com"
               autoComplete="username"
               value={identifier}
