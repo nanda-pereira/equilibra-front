@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router";
 import EmptyState from "../../components/app/EmptyState";
@@ -19,6 +18,17 @@ import {
   type PatientRecord,
 } from "../../services/api/patients";
 import { useSession } from "../../modules/session/session";
+
+type CaregiverReference =
+  | string
+  | {
+      id?: string;
+      _id?: string;
+      fullName?: string;
+      email?: string;
+      role?: string;
+    }
+  | null;
 
 type PatientItem = {
   id: string;
@@ -43,7 +53,7 @@ type ObservationItem = {
 type PatientProfileWithOptionalFields = PatientProfile & {
   diagnosis?: string;
   stage?: string;
-  caregiver?: string;
+  caregiver?: CaregiverReference;
   clinicalProfile?: PatientProfile["clinicalProfile"] & {
     diagnosis?: string;
     stage?: string;
@@ -69,9 +79,26 @@ function getPatientId(patient: PatientProfile): string {
   return patient.id ?? patient._id ?? "";
 }
 
-function toPatientItem(
-  patient: PatientProfile,
-): PatientItem {
+
+function getCaregiverName(
+  caregiver: CaregiverReference | undefined,
+): string | undefined {
+  if (typeof caregiver === "string") {
+    return caregiver.trim() || undefined;
+  }
+
+  if (!caregiver || typeof caregiver !== "object") {
+    return undefined;
+  }
+
+  return (
+    caregiver.fullName?.trim() ||
+    caregiver.email?.trim() ||
+    undefined
+  );
+}
+
+function toPatientItem(patient: PatientProfile): PatientItem {
   const profile = patient as PatientProfileWithOptionalFields;
   const user = patient.userId;
 
@@ -98,7 +125,7 @@ function toPatientItem(
     stage:
       profile.stage ??
       profile.clinicalProfile?.stage,
-    caregiver: profile.caregiver,
+    caregiver: getCaregiverName(profile.caregiver),
     notes: patient.clinicalProfile?.followUpNotes,
   };
 }
